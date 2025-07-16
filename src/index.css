@@ -2,57 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
+/* CX Quiz Hub Design System - Ultrahuman Brand Colors */
 @layer base {
   :root {
+    /* Ultrahuman Brand Colors */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    --foreground: 0 0% 6%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 0 0% 6%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
-    --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --popover-foreground: 0 0% 6%;
+    
+    /* Ultrahuman Primary - Charcoal/Black */
+    --primary: 0 0% 6%;
+    --primary-foreground: 0 0% 98%;
+    
+    /* Ultrahuman Secondary - Dark Gray */
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 98%;
+    
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    
+    /* Ultrahuman Accent Blue */
+    --accent: 211 100% 60%;
+    --accent-foreground: 0 0% 98%;
+    
+    /* Ultrahuman Success Green */
+    --success: 110 100% 53%;
+    --success-foreground: 0 0% 6%;
+    
+    /* Ultrahuman Warning Orange */
+    --warning: 35 100% 50%;
+    --warning-foreground: 0 0% 6%;
+    
+    /* Ultrahuman Error Red */
+    --destructive: 0 100% 50%;
+    --destructive-foreground: 0 0% 98%;
+    
+    /* Ultrahuman Yellow Highlight */
+    --highlight: 49 100% 63%;
+    --highlight-foreground: 0 0% 6%;
+    
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 211 100% 60%;
+    
+    --radius: 0.75rem;
+    
+    /* Quiz-specific colors */
+    --quiz-correct: 110 100% 53%;
+    --quiz-incorrect: 0 100% 50%;
+    --quiz-timer: 35 100% 50%;
+    
+    /* Category colors */
+    --category-sensor: 267 100% 70%;
+    --category-logistics: 32 100% 60%;
+    --category-ring: 168 100% 50%;
+    --category-payment: 271 81% 56%;
+    --category-account: 217 91% 60%;
+    --category-general: 0 0% 45%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(211 100% 60%), hsl(267 100% 70%));
+    --gradient-success: linear-gradient(135deg, hsl(110 100% 53%), hsl(168 100% 50%));
+    --gradient-card: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 98%));
+    
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.1);
+    --shadow-medium: 0 8px 32px -8px hsl(0 0% 0% / 0.12);
+    --shadow-strong: 0 16px 64px -16px hsl(0 0% 0% / 0.15);
+    
+    /* Animations */
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
 
   .dark {
@@ -94,12 +120,104 @@ All colors MUST be HSL.
   }
 }
 
+}
+
 @layer base {
   * {
     @apply border-border;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+  }
+}
+
+@layer components {
+  /* Quiz Hub Component Styles */
+  .quiz-card {
+    @apply bg-gradient-to-br from-card to-muted/20 border border-border rounded-lg shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-medium)] transition-all duration-300;
+  }
+  
+  .quiz-button-primary {
+    @apply bg-gradient-to-r from-accent to-[hsl(267_100%_70%)] text-accent-foreground font-medium px-6 py-3 rounded-lg shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-medium)] hover:scale-105 transition-all duration-200;
+  }
+  
+  .quiz-button-success {
+    @apply bg-gradient-to-r from-[hsl(var(--success))] to-[hsl(168_100%_50%)] text-success-foreground font-medium px-6 py-3 rounded-lg shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-medium)] hover:scale-105 transition-all duration-200;
+  }
+  
+  .quiz-button-danger {
+    @apply bg-gradient-to-r from-destructive to-[hsl(15_100%_50%)] text-destructive-foreground font-medium px-6 py-3 rounded-lg shadow-[var(--shadow-soft)] hover:shadow-[var(--shadow-medium)] hover:scale-105 transition-all duration-200;
+  }
+  
+  .category-sensor {
+    @apply bg-[hsl(var(--category-sensor))]/10 text-[hsl(var(--category-sensor))] border-[hsl(var(--category-sensor))]/20;
+  }
+  
+  .category-logistics {
+    @apply bg-[hsl(var(--category-logistics))]/10 text-[hsl(var(--category-logistics))] border-[hsl(var(--category-logistics))]/20;
+  }
+  
+  .category-ring {
+    @apply bg-[hsl(var(--category-ring))]/10 text-[hsl(var(--category-ring))] border-[hsl(var(--category-ring))]/20;
+  }
+  
+  .category-payment {
+    @apply bg-[hsl(var(--category-payment))]/10 text-[hsl(var(--category-payment))] border-[hsl(var(--category-payment))]/20;
+  }
+  
+  .category-account {
+    @apply bg-[hsl(var(--category-account))]/10 text-[hsl(var(--category-account))] border-[hsl(var(--category-account))]/20;
+  }
+  
+  .category-general {
+    @apply bg-[hsl(var(--category-general))]/10 text-[hsl(var(--category-general))] border-[hsl(var(--category-general))]/20;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+  
+  .animate-pulse-ring {
+    animation: pulseRing 2s ease-out infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulseRing {
+  0% {
+    box-shadow: 0 0 0 0 hsl(var(--accent) / 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 10px hsl(var(--accent) / 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 hsl(var(--accent) / 0);
   }
 }

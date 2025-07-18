@@ -1,11 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Play, Clock, HelpCircle, Target } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { mockTopics } from '../../data/mockData';
-import { Topic } from '../../types';
+import { topicsAPI, categoriesAPI } from '../../services/api';
+import { Topic, Category } from '../../types';
 
 interface QuizSelectionProps {
   onStartQuiz: (topic: Topic) => void;
@@ -13,19 +13,35 @@ interface QuizSelectionProps {
 
 export function QuizSelection({ onStartQuiz }: QuizSelectionProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
-  
-  const categories = [
-    { value: 'all', label: 'All Categories' },
-    { value: 'sensor', label: 'Sensor' },
-    { value: 'ring', label: 'Ring' },
-    { value: 'payment', label: 'Payment' },
-    { value: 'logistics', label: 'Logistics' },
-    { value: 'account', label: 'Account' }
-  ];
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        console.log('QuizSelection: Loading topics and categories...');
+        const [availableTopics, availableCategories] = await Promise.all([
+          topicsAPI.getAllTopics(), // Use getAllTopics to see all topics regardless of status
+          categoriesAPI.getCategories()
+        ]);
+        console.log('QuizSelection: Loaded topics:', availableTopics);
+        console.log('QuizSelection: Loaded categories:', availableCategories);
+        setTopics(availableTopics);
+        setCategories(availableCategories);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
 
   const filteredTopics = selectedCategory === 'all' 
-    ? mockTopics 
-    : mockTopics.filter(topic => topic.category === selectedCategory);
+    ? topics 
+    : topics.filter(topic => topic.category === selectedCategory);
 
   const getCategoryClass = (category: string) => {
     return `category-${category} px-3 py-1 rounded-full text-xs font-medium border`;
@@ -61,9 +77,10 @@ export function QuizSelection({ onStartQuiz }: QuizSelectionProps) {
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
                   {categories.map(cat => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.displayName}
                     </SelectItem>
                   ))}
                 </SelectContent>

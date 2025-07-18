@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    function isCoach() {
+      return isAuthenticated() && getUserRole() == 'coach';
+    }
+    
+    function isCoachOrAdmin() {
+      return isCoach() || isAdmin();
+    }
+    
+    function isValidUltrahumanEmail() {
+      return request.auth.token.email.matches('.*@ultrahuman\\.com$');
+    }
+    
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isCoachOrAdmin());
+      allow create: if isAuthenticated() && isValidUltrahumanEmail() && isOwner(userId);
+      allow update: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    // Categories - full CRUD for coaches and admins
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated() && isValidUltrahumanEmail();
+      allow create, update, delete: if isCoachOrAdmin();
+    }
+    
+    // Topics - full CRUD for coaches and admins
+    match /topics/{topicId} {
+      allow read: if isAuthenticated() && isValidUltrahumanEmail();
+      allow create, update, delete: if isCoachOrAdmin();
+      
+      // Questions subcollection
+      match /questions/{questionId} {
+        allow read: if isAuthenticated() && isValidUltrahumanEmail();
+        allow create, update, delete: if isCoachOrAdmin();
+      }
+    }
+    
+    // Quiz attempts - users can create their own, coaches/admins can read all
+    match /quizAttempts/{attemptId} {
+      allow read: if isAuthenticated() && isValidUltrahumanEmail();
+      allow create: if isAuthenticated() && isValidUltrahumanEmail();
+      allow update, delete: if false; // Quiz attempts are immutable
+    }
+    
+    // User stats - readable by all, writable by cloud functions
+    match /userStats/{userId} {
+      allow read: if isAuthenticated() && isValidUltrahumanEmail();
+      allow write: if false; // Will be updated by cloud functions
+    }
+    
+    // Audit logs - admins can read all
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated(); // Allow audit log creation
+      allow update, delete: if false; // Audit logs are immutable
+    }
+  }
+}

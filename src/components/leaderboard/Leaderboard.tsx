@@ -1,14 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Trophy, Medal, Award, Clock, Target, Zap, Crown, Star } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { mockLeaderboard } from '../../data/mockData';
+import { leaderboardAPI } from '../../services/api';
+import { LeaderboardEntry } from '../../types';
 
 export function Leaderboard() {
   const [period, setPeriod] = useState<'current' | 'last'>('current');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadLeaderboard = async () => {
+      try {
+        const data = await leaderboardAPI.getLeaderboard();
+        setLeaderboard(data);
+      } catch (error) {
+        console.error('Error loading leaderboard:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadLeaderboard();
+  }, []);
   
   const getRankIcon = (rank: number) => {
     switch (rank) {
@@ -57,7 +75,7 @@ export function Leaderboard() {
 
       {/* Top 3 Podium */}
       <div className="grid gap-4 md:grid-cols-3">
-        {mockLeaderboard.slice(0, 3).map((entry, index) => {
+                    {leaderboard.slice(0, 3).map((entry, index) => {
           const rank = index + 1;
           return (
             <Card key={entry.id} className={`${getRankStyle(rank)} relative overflow-hidden`}>
@@ -120,7 +138,7 @@ export function Leaderboard() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {mockLeaderboard.map((entry, index) => {
+            {leaderboard.map((entry, index) => {
               const rank = index + 1;
               return (
                 <div 
@@ -199,9 +217,9 @@ export function Leaderboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-lg font-bold text-foreground">{mockLeaderboard[0].name}</div>
+            <div className="text-lg font-bold text-foreground">{leaderboard[0]?.name || 'No data'}</div>
             <div className="text-sm text-muted-foreground">
-              {mockLeaderboard[0].weeklyPoints.toLocaleString()} points this week
+              {leaderboard[0]?.weeklyPoints.toLocaleString() || 0} points this week
             </div>
           </CardContent>
         </Card>
@@ -215,10 +233,10 @@ export function Leaderboard() {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold text-[hsl(var(--success))]">
-              {Math.max(...mockLeaderboard.map(e => e.accuracy))}%
+              {leaderboard.length > 0 ? Math.max(...leaderboard.map(e => e.accuracy)) : 0}%
             </div>
             <div className="text-sm text-muted-foreground">
-              {mockLeaderboard.find(e => e.accuracy === Math.max(...mockLeaderboard.map(l => l.accuracy)))?.name}
+              {leaderboard.length > 0 ? leaderboard.find(e => e.accuracy === Math.max(...leaderboard.map(l => l.accuracy)))?.name : 'No data'}
             </div>
           </CardContent>
         </Card>
@@ -232,10 +250,10 @@ export function Leaderboard() {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold text-accent">
-              {Math.min(...mockLeaderboard.map(e => e.avgResponseTime))}s
+              {leaderboard.length > 0 ? Math.min(...leaderboard.map(e => e.avgResponseTime)) : 0}s
             </div>
             <div className="text-sm text-muted-foreground">
-              {mockLeaderboard.find(e => e.avgResponseTime === Math.min(...mockLeaderboard.map(l => l.avgResponseTime)))?.name}
+              {leaderboard.length > 0 ? leaderboard.find(e => e.avgResponseTime === Math.min(...leaderboard.map(l => l.avgResponseTime)))?.name : 'No data'}
             </div>
           </CardContent>
         </Card>

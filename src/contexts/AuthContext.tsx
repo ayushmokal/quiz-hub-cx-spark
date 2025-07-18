@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
-import { mockUsers } from '../data/mockData';
+import { authAPI } from '../services/firebase-api';
 
 interface AuthContextType {
   user: User | null;
@@ -17,51 +17,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session
-    const savedUser = localStorage.getItem('cxQuizUser');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
+    // Listen for auth changes using Firebase
+    const unsubscribe = authAPI.onAuthStateChanged((user) => {
+      setUser(user);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Find user in mock data
-    const foundUser = mockUsers.find(u => u.email === email);
-    
-    if (foundUser && password === 'password123') {
-      setUser(foundUser);
-      localStorage.setItem('cxQuizUser', JSON.stringify(foundUser));
+    try {
+      const user = await authAPI.signIn(email, password);
+      setUser(user);
       setIsLoading(false);
       return true;
+    } catch (error) {
+      console.error('Login error:', error);
+      setIsLoading(false);
+      return false;
     }
-    
-    setIsLoading(false);
-    return false;
   };
 
   const loginWithGoogle = async (): Promise<boolean> => {
     setIsLoading(true);
     
-    // Simulate Google OAuth
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Default to admin user for demo
-    const adminUser = mockUsers.find(u => u.role === 'admin')!;
-    setUser(adminUser);
-    localStorage.setItem('cxQuizUser', JSON.stringify(adminUser));
-    setIsLoading(false);
-    return true;
+    try {
+      await authAPI.signInWithGoogle();
+      // The auth state change listener will handle setting the user
+      return true;
+    } catch (error) {
+      console.error('Google login error:', error);
+      setIsLoading(false);
+      return false;
+    }
   };
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('cxQuizUser');
+  const logout = async () => {
+    try {
+      await authAPI.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
   };
 
   return (

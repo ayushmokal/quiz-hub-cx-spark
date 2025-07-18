@@ -1,4 +1,7 @@
 export type UserRole = 'agent' | 'coach' | 'admin';
+export type QuestionType = 'multiple-choice' | 'multi-select' | 'case-study';
+export type TopicStatus = 'active' | 'inactive' | 'draft';
+export type CategoryType = 'sensor' | 'ring' | 'payment' | 'logistics' | 'account';
 
 export interface User {
   id: string;
@@ -10,19 +13,27 @@ export interface User {
   joinedAt: string;
 }
 
-export type QuestionType = 'multiple-choice' | 'multi-select' | 'drag-sequence' | 'case-study';
-
-export type Category = 'sensor' | 'logistics' | 'ring' | 'payment' | 'account' | 'general';
+export interface Category {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  icon?: string;
+  color?: string;
+  isActive: boolean;
+  createdAt: string;
+  createdBy?: string;
+}
 
 export interface Topic {
   id: string;
   displayName: string;
   slug: string;
-  description: string;
-  category: Category;
+  description?: string;
+  category: CategoryType;
   questionCount: number;
   averageAccuracy: number;
-  status: 'active' | 'draft' | 'archived';
+  status: TopicStatus;
 }
 
 export interface Question {
@@ -69,4 +80,21 @@ export interface DashboardStats {
   currentStreak: number;
   weeklyQuizzes: number;
   topCategory: string;
+}
+
+export interface AuditLog {
+  id: string;
+  tableName: string;
+  recordId: string;
+  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  oldValues?: any;
+  newValues?: any;
+  changedBy: string;
+  changedAt: string;
+  ipAddress?: string;
+  userAgent?: string;
+  user?: {
+    name: string;
+    email: string;
+  };
 }

@@ -1,18 +1,54 @@
+import { useState, useEffect, useCallback } from 'react';
 import { Target, Clock, Zap, TrendingUp, Trophy, BookOpen, Play } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { useAuth } from '../../contexts/AuthContext';
-import { mockDashboardStats, mockTopics } from '../../data/mockData';
+import { dashboardAPI, topicsAPI } from '../../services/api';
+import { Topic, DashboardStats } from '../../types';
 
 interface DashboardProps {
   onViewChange: (view: string) => void;
+  refreshTrigger?: number; // Add prop to trigger refresh
 }
 
-export function Dashboard({ onViewChange }: DashboardProps) {
+export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
   const { user } = useAuth();
-  const stats = mockDashboardStats;
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [topics, setTopics] = useState<Topic[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const loadDashboardData = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      console.log('Dashboard: Refreshing data...');
+      const [userStats, availableTopics] = await Promise.all([
+        dashboardAPI.getUserDashboardStats(user.id),
+        topicsAPI.getTopics()
+      ]);
+      
+      setStats(userStats);
+      setTopics(availableTopics);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  // Refresh when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger) {
+      console.log('Dashboard: Triggered refresh due to refreshTrigger:', refreshTrigger);
+      loadDashboardData();
+    }
+  }, [refreshTrigger, loadDashboardData]);
 
   const getCategoryClass = (category: string) => {
     return `category-${category} px-3 py-1 rounded-full text-xs font-medium border`;
@@ -23,6 +59,25 @@ export function Dashboard({ onViewChange }: DashboardProps) {
     if (accuracy >= 60) return 'text-[hsl(var(--warning))]';
     return 'text-destructive';
   };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-muted-foreground">Error loading dashboard data</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -113,7 +168,7 @@ export function Dashboard({ onViewChange }: DashboardProps) {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {mockTopics.map((topic) => (
+            {topics.slice(0, 6).map((topic) => (
               <div
                 key={topic.id}
                 className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer group"

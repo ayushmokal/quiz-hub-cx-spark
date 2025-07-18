@@ -3,6 +3,7 @@ import {
   Play, 
   Trophy, 
   BookOpen, 
+  Tag,
   BarChart3,
   Settings,
   Users,
@@ -25,7 +26,8 @@ export function Navigation({ currentView, onViewChange }: NavigationProps) {
     { id: 'leaderboard', label: 'Leaderboard', icon: Trophy, roles: ['agent', 'coach', 'admin'] },
     { id: 'manage-questions', label: 'Questions', icon: FileText, roles: ['coach', 'admin'] },
     { id: 'manage-topics', label: 'Topics', icon: BookOpen, roles: ['coach', 'admin'] },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['coach', 'admin'] },
+    { id: 'manage-categories', label: 'Categories', icon: Tag, roles: ['coach', 'admin'] },
+    { id: 'analytics', label: 'Audit Log', icon: BarChart3, roles: ['coach', 'admin'] },
     { id: 'manage-users', label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] }
   ];

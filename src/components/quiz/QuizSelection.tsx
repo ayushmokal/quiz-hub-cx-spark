@@ -23,10 +23,12 @@ export function QuizSelection({ onStartQuiz }: QuizSelectionProps) {
         console.log('QuizSelection: Loading topics and categories...');
         const [availableTopics, availableCategories] = await Promise.all([
           topicsAPI.getAllTopics(), // Use getAllTopics to see all topics regardless of status
-          categoriesAPI.getCategories()
+          categoriesAPI.getAllCategories() // Use getAllCategories to avoid index requirement
         ]);
         console.log('QuizSelection: Loaded topics:', availableTopics);
         console.log('QuizSelection: Loaded categories:', availableCategories);
+        console.log('QuizSelection: Topic categories:', availableTopics.map(t => t.category));
+        console.log('QuizSelection: Available category names:', availableCategories.map(c => c.name));
         setTopics(availableTopics);
         setCategories(availableCategories);
       } catch (error) {
@@ -42,6 +44,10 @@ export function QuizSelection({ onStartQuiz }: QuizSelectionProps) {
   const filteredTopics = selectedCategory === 'all' 
     ? topics 
     : topics.filter(topic => topic.category === selectedCategory);
+
+  console.log('QuizSelection: Selected category:', selectedCategory);
+  console.log('QuizSelection: All topics:', topics);
+  console.log('QuizSelection: Filtered topics:', filteredTopics);
 
   const getCategoryClass = (category: string) => {
     return `category-${category} px-3 py-1 rounded-full text-xs font-medium border`;
@@ -87,17 +93,37 @@ export function QuizSelection({ onStartQuiz }: QuizSelectionProps) {
               </Select>
             </div>
             <div className="text-sm text-muted-foreground">
-              {filteredTopics.length} topics available
+              {isLoading ? "Loading..." : `${filteredTopics.length} topics available`}
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Topics Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {filteredTopics.map((topic) => {
-          const difficultyInfo = getDifficultyInfo(topic.questionCount);
-          const DifficultyIcon = difficultyInfo.icon;
+      {isLoading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <Card key={i} className="quiz-card animate-pulse">
+              <CardHeader>
+                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-6 bg-muted rounded w-full mb-2"></div>
+                <div className="h-12 bg-muted rounded w-full"></div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="h-16 bg-muted rounded"></div>
+                  <div className="h-16 bg-muted rounded"></div>
+                </div>
+                <div className="h-10 bg-muted rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {filteredTopics.map((topic) => {
+            const difficultyInfo = getDifficultyInfo(topic.questionCount);
+            const DifficultyIcon = difficultyInfo.icon;
 
           return (
             <Card key={topic.id} className="quiz-card group hover:scale-105 transition-all duration-300">
@@ -161,23 +187,29 @@ export function QuizSelection({ onStartQuiz }: QuizSelectionProps) {
             </Card>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Empty State */}
-      {filteredTopics.length === 0 && (
+      {!isLoading && filteredTopics.length === 0 && (
         <Card className="quiz-card">
           <CardContent className="flex flex-col items-center justify-center py-12">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-lg font-semibold text-foreground mb-2">No topics found</h3>
             <p className="text-muted-foreground text-center mb-4">
-              No quiz topics match your current filter selection.
+              {topics.length === 0 
+                ? "No quiz topics are available yet. Please contact an administrator to create some topics."
+                : "No quiz topics match your current filter selection."
+              }
             </p>
-            <Button 
-              onClick={() => setSelectedCategory('all')}
-              variant="outline"
-            >
-              Show All Topics
-            </Button>
+            {topics.length > 0 && (
+              <Button 
+                onClick={() => setSelectedCategory('all')}
+                variant="outline"
+              >
+                Show All Topics
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}

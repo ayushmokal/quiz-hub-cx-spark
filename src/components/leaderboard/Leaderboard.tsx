@@ -104,7 +104,7 @@ export function Leaderboard() {
                 
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   <div className="text-center p-2 bg-muted/20 rounded">
-                    <div className="font-semibold text-[hsl(var(--success))]">{entry.accuracy}%</div>
+                    <div className="font-semibold text-[#08a104]">{entry.accuracy}%</div>
                     <div className="text-xs text-muted-foreground">Accuracy</div>
                   </div>
                   <div className="text-center p-2 bg-muted/20 rounded">
@@ -179,7 +179,7 @@ export function Leaderboard() {
                       <div className="text-muted-foreground">Points</div>
                     </div>
                     <div className="text-center">
-                      <div className="font-bold text-[hsl(var(--success))]">{entry.accuracy}%</div>
+                      <div className="font-bold text-[#08a104]">{entry.accuracy}%</div>
                       <div className="text-muted-foreground">Accuracy</div>
                     </div>
                     <div className="text-center">

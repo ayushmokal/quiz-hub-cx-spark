@@ -7,7 +7,8 @@ import {
   BarChart3,
   Settings,
   Users,
-  FileText
+  FileText,
+  Upload
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { useAuth } from '../../contexts/AuthContext';
@@ -27,6 +28,7 @@ export function Navigation({ currentView, onViewChange }: NavigationProps) {
     { id: 'manage-questions', label: 'Questions', icon: FileText, roles: ['coach', 'admin'] },
     { id: 'manage-topics', label: 'Topics', icon: BookOpen, roles: ['coach', 'admin'] },
     { id: 'manage-categories', label: 'Categories', icon: Tag, roles: ['coach', 'admin'] },
+    { id: 'quiz-import', label: 'Import Quizzes', icon: Upload, roles: ['admin'] },
     { id: 'analytics', label: 'Audit Log', icon: BarChart3, roles: ['coach', 'admin'] },
     { id: 'manage-users', label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'settings', label: 'Settings', icon: Settings, roles: ['admin'] }
@@ -37,7 +39,7 @@ export function Navigation({ currentView, onViewChange }: NavigationProps) {
   );
 
   return (
-    <nav className="w-64 bg-card border-r border-border p-4">
+    <nav className="w-64 bg-white border-r border-[#46494D]/20 p-4 h-full">
       <div className="space-y-1">
         {filteredItems.map((item) => {
           const Icon = item.icon;
@@ -47,15 +49,15 @@ export function Navigation({ currentView, onViewChange }: NavigationProps) {
             <Button
               key={item.id}
               variant={isActive ? "default" : "ghost"}
-              className={`w-full justify-start ${
+              className={`w-full justify-start rounded-xl transition-all duration-200 ${
                 isActive 
-                  ? 'bg-gradient-to-r from-accent to-[hsl(267_100%_70%)] text-white shadow-[var(--shadow-soft)]' 
-                  : 'hover:bg-muted/50'
+                  ? 'bg-gradient-to-r from-[#FF0000] to-[#FF4500] text-white shadow-lg font-medium' 
+                  : 'hover:bg-[#F5F5F5] text-[#212121] hover:text-black'
               }`}
               onClick={() => onViewChange(item.id)}
             >
               <Icon className="mr-3 h-4 w-4" />
-              {item.label}
+              <span className="font-medium">{item.label}</span>
             </Button>
           );
         })}

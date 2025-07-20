@@ -2,52 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CX Quiz Hub Design System - Ultrahuman Brand Colors */
+/* Import Ultrahuman Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/* CX Ultra Quiz Design System - Ultrahuman Brand Colors */
 @layer base {
   :root {
     /* Ultrahuman Brand Colors */
     --background: 0 0% 100%;
-    --foreground: 0 0% 6%;
+    --foreground: 0 0% 0%;
     
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 6%;
+    --card-foreground: 0 0% 0%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 6%;
+    --popover-foreground: 0 0% 0%;
     
-    /* Ultrahuman Primary - Charcoal/Black */
-    --primary: 0 0% 6%;
-    --primary-foreground: 0 0% 98%;
+    /* Ultrahuman Primary - Black (#000000) */
+    --primary: 0 0% 0%;
+    --primary-foreground: 0 0% 100%;
     
-    /* Ultrahuman Secondary - Dark Gray */
-    --secondary: 0 0% 13%;
-    --secondary-foreground: 0 0% 98%;
+    /* Ultrahuman Secondary - Dark Gray (#101010) */
+    --secondary: 0 0% 6%;
+    --secondary-foreground: 0 0% 100%;
     
     --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 211 11% 31%;
     
-    /* Ultrahuman Accent Blue */
-    --accent: 211 100% 60%;
-    --accent-foreground: 0 0% 98%;
+    /* Ultrahuman Red (#FF0000) */
+    --accent: 0 100% 50%;
+    --accent-foreground: 0 0% 100%;
     
-    /* Ultrahuman Success Green */
-    --success: 110 100% 53%;
-    --success-foreground: 0 0% 6%;
+    /* Ultrahuman Green - More subtle version (#08a104) */
+    --success: 110 96% 33%;
+    --success-foreground: 0 0% 100%;
     
-    /* Ultrahuman Warning Orange */
-    --warning: 35 100% 50%;
-    --warning-foreground: 0 0% 6%;
+    /* Ultrahuman Orange (#FD9400) */
+    --warning: 36 100% 49%;
+    --warning-foreground: 0 0% 0%;
     
-    /* Ultrahuman Error Red */
+    /* Ultrahuman Red for destructive actions */
     --destructive: 0 100% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive-foreground: 0 0% 100%;
     
-    /* Ultrahuman Yellow Highlight */
-    --highlight: 49 100% 63%;
-    --highlight-foreground: 0 0% 6%;
+    /* Ultrahuman Yellow (#FCDD00) */
+    --highlight: 52 100% 49%;
+    --highlight-foreground: 0 0% 0%;
     
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
+    --border: 211 11% 71%;
+    --input: 0 0% 96%;
     --ring: 211 100% 60%;
     
     --radius: 0.75rem;
@@ -127,7 +130,10 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 

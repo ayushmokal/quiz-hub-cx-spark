@@ -53,7 +53,7 @@ export function TopicManagement() {
     displayName: '',
     slug: '',
     description: '',
-    category: 'sensor',
+    category: '', // Will be set to first available category when categories load
     status: 'active'
   });
 
@@ -87,6 +87,14 @@ export function TopicManagement() {
     try {
       const allCategories = await categoriesAPI.getAllCategories();
       setCategories(allCategories);
+      
+      // Set default category if form is empty
+      if (allCategories.length > 0 && !formData.category) {
+        setFormData(prev => ({ 
+          ...prev, 
+          category: allCategories[0].name 
+        }));
+      }
     } catch (error) {
       console.error('Error loading categories:', error);
       toast({
@@ -102,7 +110,7 @@ export function TopicManagement() {
       displayName: '',
       slug: '',
       description: '',
-      category: 'sensor',
+      category: categories.length > 0 ? categories[0].name : '',
       status: 'active'
     });
   };
@@ -130,7 +138,7 @@ export function TopicManagement() {
         displayName: formData.displayName,
         slug: formData.slug,
         description: formData.description,
-        category: formData.category as any,
+        category: formData.category,
         status: formData.status
       });
 
@@ -172,7 +180,7 @@ export function TopicManagement() {
         displayName: formData.displayName,
         slug: formData.slug,
         description: formData.description,
-        category: formData.category as any,
+        category: formData.category,
         status: formData.status
       });
 

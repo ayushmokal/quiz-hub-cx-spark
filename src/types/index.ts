@@ -30,7 +30,7 @@ export interface Topic {
   displayName: string;
   slug: string;
   description?: string;
-  category: CategoryType;
+  category: string; // Changed from CategoryType to string to allow any category
   questionCount: number;
   averageAccuracy: number;
   status: TopicStatus;

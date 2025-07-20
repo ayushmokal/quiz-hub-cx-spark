@@ -65,6 +65,10 @@ const updateUserStats = async (userId: string, quizResult: {
   try {
     console.log('UserStats: Updating stats for user:', userId, 'with result:', quizResult);
     
+    // Get topic details to find category
+    const topicDoc = await getDoc(doc(db, 'topics', quizResult.topicId));
+    const topicCategory = topicDoc.exists() ? topicDoc.data()?.category || 'unknown' : 'unknown';
+    
     const userStatsRef = doc(db, 'userStats', userId);
     const userStatsDoc = await getDoc(userStatsRef);
     
@@ -81,6 +85,28 @@ const updateUserStats = async (userId: string, quizResult: {
       // Update streak (simplified - just increment if accuracy >= 70%, reset if not)
       const newStreak = quizResult.accuracy >= 70 ? (currentStats.currentStreak || 0) + 1 : 0;
       
+      // Update category performance tracking
+      const categoryStats = currentStats.categoryStats || {};
+      const currentCategoryStats = categoryStats[topicCategory] || { totalQuizzes: 0, totalPoints: 0, totalAccuracy: 0 };
+      
+      categoryStats[topicCategory] = {
+        totalQuizzes: currentCategoryStats.totalQuizzes + 1,
+        totalPoints: currentCategoryStats.totalPoints + quizResult.score,
+        totalAccuracy: currentCategoryStats.totalAccuracy + quizResult.accuracy,
+        avgAccuracy: (currentCategoryStats.totalAccuracy + quizResult.accuracy) / (currentCategoryStats.totalQuizzes + 1)
+      };
+      
+      // Find best category (highest average accuracy with at least 1 quiz)
+      let bestCategory = topicCategory;
+      let bestAccuracy = categoryStats[topicCategory].avgAccuracy;
+      
+      Object.entries(categoryStats).forEach(([category, stats]: [string, any]) => {
+        if (stats.totalQuizzes > 0 && stats.avgAccuracy > bestAccuracy) {
+          bestCategory = category;
+          bestAccuracy = stats.avgAccuracy;
+        }
+      });
+      
       // Get current week key (e.g., "2024-W01")
       const now = new Date();
       const weekKey = `${now.getFullYear()}-W${Math.ceil((now.getDate() - now.getDay() + 1) / 7)}`;
@@ -92,6 +118,8 @@ const updateUserStats = async (userId: string, quizResult: {
         currentStreak: newStreak,
         totalQuizzes: totalQuizzes,
         weeklyQuizzes: totalQuizzes, // Simplified - could be week-specific
+        bestCategory: bestCategory,
+        categoryStats: categoryStats,
         lastUpdated: Timestamp.now(),
         [`weeklyStats.${weekKey}.quizzes`]: increment(1),
         [`weeklyStats.${weekKey}.points`]: increment(quizResult.score)
@@ -109,7 +137,15 @@ const updateUserStats = async (userId: string, quizResult: {
         currentStreak: quizResult.accuracy >= 70 ? 1 : 0,
         totalQuizzes: 1,
         weeklyQuizzes: 1,
-        bestCategory: '', // Could be derived from topicId
+        bestCategory: topicCategory,
+        categoryStats: {
+          [topicCategory]: {
+            totalQuizzes: 1,
+            totalPoints: quizResult.score,
+            totalAccuracy: quizResult.accuracy,
+            avgAccuracy: quizResult.accuracy
+          }
+        },
         lastUpdated: Timestamp.now(),
         weeklyStats: {
           [`${new Date().getFullYear()}-W${Math.ceil((new Date().getDate() - new Date().getDay() + 1) / 7)}`]: {
@@ -194,24 +230,67 @@ export const authAPI = {
     const userDocRef = doc(db, 'users', firebaseUser.uid);
     const userDoc = await getDoc(userDocRef);
     
+    // Check if there's a manually created user record with this email
+    const email = firebaseUser.email!;
+    let manualUserData = null;
+    
+    // Search for manually created user or admin-created user by email
+    const usersQuery = query(
+      collection(db, 'users'),
+      where('email', '==', email),
+      where('authProvider', 'in', ['manual', 'email_password'])
+    );
+    const manualUserSnapshot = await getDocs(usersQuery);
+    
+    if (!manualUserSnapshot.empty) {
+      const manualUserDoc = manualUserSnapshot.docs[0];
+      manualUserData = manualUserDoc.data();
+      console.log(`Found admin/manually created user for ${email}, merging data...`);
+      
+      // Delete the manual user record only if it was a placeholder (manual auth provider)
+      // Keep email_password users in place since they're real Firebase Auth users
+      if (manualUserData.authProvider === 'manual') {
+        await deleteDoc(manualUserDoc.ref);
+      }
+    }
+    
     if (userDoc.exists()) {
       const data = userDoc.data();
-      const email = firebaseUser.email!;
       
-      // Determine correct role based on current logic
-      let correctRole: 'agent' | 'coach' | 'admin' = 'agent';
-      if (email === 'admin@ultrahuman.com' || email === 'adi@ultrahuman.com' || email === 'ayush.mokal@ultrahuman.com') {
-        correctRole = 'admin';
-      } else if (['jaideep@ultrahuman.com', 'munish@ultrahuman.com'].includes(email)) {
-        correctRole = 'coach';
+      // Determine correct role (use manual data if available, otherwise default logic)
+      let correctRole: 'agent' | 'coach' | 'admin' = manualUserData?.role || 'agent';
+      
+      if (!manualUserData) {
+        // Use default role assignment logic if no manual user found
+        if (email === 'admin@ultrahuman.com' || email === 'adi@ultrahuman.com' || email === 'ayush.mokal@ultrahuman.com') {
+          correctRole = 'admin';
+        } else if (['jaideep@ultrahuman.com', 'munish@ultrahuman.com'].includes(email)) {
+          correctRole = 'coach';
+        }
       }
       
-      // Update role if it has changed + update last login
+      // Update user data
       const updates: any = {
-        lastLoginAt: Timestamp.now()
+        lastLoginAt: Timestamp.now(),
+        isActive: true
       };
       
-      if (data.role !== correctRole) {
+      // If user was created with email/password but is now signing in with Google, update auth provider
+      if (data.authProvider === 'email_password') {
+        updates.authProvider = 'google';
+        updates.avatar = firebaseUser.photoURL || data.avatar;
+        console.log(`User ${email} transitioning from email/password to Google OAuth`);
+      } else {
+        updates.authProvider = 'google';
+      }
+      
+      // Merge manual user data if available
+      if (manualUserData) {
+        updates.role = manualUserData.role;
+        updates.department = manualUserData.department;
+        updates.name = manualUserData.name;
+        console.log(`Activated manually created user: ${manualUserData.name} (${manualUserData.role})`);
+      } else if (data.role !== correctRole) {
         updates.role = correctRole;
         console.log(`Updating role for ${email}: ${data.role} → ${correctRole}`);
       }
@@ -221,18 +300,17 @@ export const authAPI = {
       return {
         id: userDoc.id,
         email: data.email,
-        name: data.name,
-        role: correctRole, // Use the updated role
+        name: manualUserData?.name || data.name,
+        role: manualUserData?.role || correctRole,
         avatar: data.avatar,
-        department: data.department,
+        department: manualUserData?.department || data.department,
         joinedAt: data.joinedAt.toDate().toISOString()
       };
     }
     
-    // Create new user profile
-    const email = firebaseUser.email!;
+    // Create new user profile (either from manual data or fresh)
     const displayName = firebaseUser.displayName;
-    let name = displayName;
+    let name = manualUserData?.name || displayName;
     
     if (!name) {
       // Extract name from email: "first.last@ultrahuman.com" -> "First Last"
@@ -243,29 +321,42 @@ export const authAPI = {
         .join(' ');
     }
 
-    // Determine role based on email
-    let role: 'agent' | 'coach' | 'admin' = 'agent';
-    if (email === 'admin@ultrahuman.com' || email === 'adi@ultrahuman.com' || email === 'ayush.mokal@ultrahuman.com') {
-      role = 'admin';
-    } else if (['jaideep@ultrahuman.com', 'munish@ultrahuman.com'].includes(email)) {
-      role = 'coach';
+    // Determine role (use manual data if available, otherwise default logic)
+    let role: 'agent' | 'coach' | 'admin' = manualUserData?.role || 'agent';
+    
+    if (!manualUserData) {
+      if (email === 'admin@ultrahuman.com' || email === 'adi@ultrahuman.com' || email === 'ayush.mokal@ultrahuman.com') {
+        role = 'admin';
+      } else if (['jaideep@ultrahuman.com', 'munish@ultrahuman.com'].includes(email)) {
+        role = 'coach';
+      }
     }
 
     const newUser = {
       email,
       name,
       role,
-      department: 'Customer Support',
+      department: manualUserData?.department || 'Customer Support',
       avatar: firebaseUser.photoURL,
-      joinedAt: Timestamp.now(),
+      joinedAt: manualUserData?.joinedAt || Timestamp.now(),
       lastLoginAt: Timestamp.now(),
-      isActive: true
+      isActive: true,
+      authProvider: 'google',
+      createdBy: manualUserData?.createdBy || null,
+      notes: manualUserData?.notes || ''
     };
 
     await setDoc(userDocRef, newUser);
     
     // Create audit log
-    await createAuditLog('users', firebaseUser.uid, 'CREATE', null, newUser);
+    await createAuditLog('users', firebaseUser.uid, 'CREATE', null, {
+      ...newUser,
+      activatedFromManualCreation: !!manualUserData
+    });
+    
+    if (manualUserData) {
+      console.log(`✅ Successfully activated manually created user: ${name} (${role})`);
+    }
     
     return {
       id: firebaseUser.uid,
@@ -801,6 +892,12 @@ export const quizAPI = {
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
     
+    // Get topic details to find category name
+    const topicDoc = await getDoc(doc(db, 'topics', attempt.topicId));
+    const topicCategory = topicDoc.exists() ? topicDoc.data()?.category || 'unknown' : 'unknown';
+    
+    console.log('Quiz: Topic category for quiz attempt:', topicCategory);
+    
     // Serialize nested arrays for Firestore compatibility
     const serializedQuestions = attempt.questions.map(q => ({
       id: q.id,
@@ -823,12 +920,15 @@ export const quizAPI = {
     const newAttempt: any = {
       userId: attempt.userId,
       topicId: attempt.topicId,
+      categoryName: topicCategory, // Add category name to quiz attempt
       questions: serializedQuestions,
       answers: serializedAnswers, // Flattened structure for Firestore
       score: attempt.score,
       accuracy: attempt.accuracy,
       avgTime: attempt.avgTime,
       streak: attempt.streak,
+      totalQuestions: attempt.questions.length, // Add total questions count
+      correctAnswers: Math.round((attempt.accuracy / 100) * attempt.questions.length), // Calculate correct answers
       completedAt: Timestamp.now(),
       metadata: {
         userAgent: navigator.userAgent,
@@ -906,19 +1006,58 @@ export const dashboardAPI = {
           avgResponseTime: 0,
           currentStreak: 0,
           weeklyQuizzes: 0,
-          topCategory: 'sensor'
+          topCategory: 'No quizzes yet'
         };
       }
       
       const data = userStatsDoc.data();
       console.log('Dashboard: User stats found:', data);
+      
+      // If bestCategory is missing or empty, try to calculate it from quiz attempts
+      let bestCategory = data.bestCategory;
+      if (!bestCategory || bestCategory === '' || bestCategory === 'sensor') {
+        try {
+          const userAttempts = await this.getUserQuizAttempts(userId);
+          if (userAttempts.length > 0) {
+            // Calculate best category from existing attempts
+            const categoryPerformance: Record<string, { totalAccuracy: number; count: number }> = {};
+            
+            for (const attempt of userAttempts) {
+              // Get topic category
+              const topicDoc = await getDoc(doc(db, 'topics', attempt.topicId));
+              const category = topicDoc.exists() ? topicDoc.data()?.category || 'unknown' : 'unknown';
+              
+              if (!categoryPerformance[category]) {
+                categoryPerformance[category] = { totalAccuracy: 0, count: 0 };
+              }
+              categoryPerformance[category].totalAccuracy += attempt.accuracy;
+              categoryPerformance[category].count += 1;
+            }
+            
+            // Find best performing category
+            let bestAvgAccuracy = 0;
+            Object.entries(categoryPerformance).forEach(([category, stats]) => {
+              const avgAccuracy = stats.totalAccuracy / stats.count;
+              if (avgAccuracy > bestAvgAccuracy) {
+                bestCategory = category;
+                bestAvgAccuracy = avgAccuracy;
+              }
+            });
+            
+            console.log('Dashboard: Calculated best category from attempts:', bestCategory);
+          }
+        } catch (error) {
+          console.error('Dashboard: Error calculating best category:', error);
+        }
+      }
+      
       return {
         totalPoints: data.totalPoints || 0,
         overallAccuracy: data.overallAccuracy || 0,
         avgResponseTime: data.avgResponseTime || 0,
         currentStreak: data.currentStreak || 0,
         weeklyQuizzes: data.weeklyQuizzes || 0,
-        topCategory: data.bestCategory || 'sensor'
+        topCategory: bestCategory || 'No quizzes yet'
       };
     } catch (error) {
       console.error('Dashboard: Error fetching user stats:', error);
@@ -929,7 +1068,7 @@ export const dashboardAPI = {
         avgResponseTime: 0,
         currentStreak: 0,
         weeklyQuizzes: 0,
-        topCategory: 'sensor'
+        topCategory: 'No quizzes yet'
       };
     }
   }
@@ -938,6 +1077,7 @@ export const dashboardAPI = {
 // Leaderboard API
 export const leaderboardAPI = {
   async getLeaderboard(): Promise<LeaderboardEntry[]> {
+    console.log('🏆 Fetching leaderboard data...');
     const q = query(
       collection(db, 'userStats'),
       orderBy('totalPoints', 'desc'),
@@ -949,11 +1089,108 @@ export const leaderboardAPI = {
     
     for (const docSnapshot of querySnapshot.docs) {
       const data = docSnapshot.data();
+      console.log(`🏆 User stats data for ${data.userId}:`, data);
       const userDocRef = doc(db, 'users', data.userId);
       const userDoc = await getDoc(userDocRef);
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        // If bestCategory is missing, is the old default "sensor", or is "No quizzes yet", recalculate it
+        let bestCategory = data.bestCategory || 'No quizzes yet';
+        
+        if (!data.bestCategory || data.bestCategory === 'sensor' || data.bestCategory === 'No quizzes yet') {
+          console.log(`🔍 Calculating best category for user ${data.userId} (current: ${data.bestCategory})`);
+          
+          // Get user's quiz attempts to calculate best category
+          const attemptsQuery = query(
+            collection(db, 'quizAttempts'),
+            where('userId', '==', data.userId)
+          );
+          const attemptsSnapshot = await getDocs(attemptsQuery);
+          
+          if (!attemptsSnapshot.empty) {
+            console.log(`📊 Found ${attemptsSnapshot.docs.length} quiz attempts for user ${data.userId}`);
+            const categoryStats: { [key: string]: { total: number; correct: number } } = {};
+            
+            for (const attemptDoc of attemptsSnapshot.docs) {
+              const attempt = attemptDoc.data();
+              console.log(`📊 Quiz attempt data:`, {
+                topicId: attempt.topicId,
+                categoryName: attempt.categoryName,
+                totalQuestions: attempt.totalQuestions,
+                correctAnswers: attempt.correctAnswers,
+                completedAt: attempt.completedAt
+              });
+              
+              let categoryName = attempt.categoryName;
+              
+              // If categoryName is missing from old attempts, look it up from the topic
+              if (!categoryName && attempt.topicId) {
+                console.log(`🔍 Looking up category for topic ${attempt.topicId}`);
+                try {
+                  const topicDoc = await getDoc(doc(db, 'topics', attempt.topicId));
+                  if (topicDoc.exists()) {
+                    categoryName = topicDoc.data()?.category;
+                    console.log(`✅ Found category for topic ${attempt.topicId}: ${categoryName}`);
+                  } else {
+                    console.log(`❌ Topic ${attempt.topicId} not found`);
+                  }
+                } catch (error) {
+                  console.log(`❌ Error looking up topic ${attempt.topicId}:`, error);
+                }
+              }
+              
+              if (categoryName) {
+                if (!categoryStats[categoryName]) {
+                  categoryStats[categoryName] = { total: 0, correct: 0 };
+                }
+                
+                // Calculate total and correct answers from the attempt data
+                const totalQuestions = attempt.totalQuestions || attempt.questions?.length || 0;
+                const correctAnswers = attempt.correctAnswers || Math.round((attempt.accuracy / 100) * totalQuestions);
+                
+                categoryStats[categoryName].total += totalQuestions;
+                categoryStats[categoryName].correct += correctAnswers;
+                
+                console.log(`📊 Added to category ${categoryName}: +${totalQuestions} total, +${correctAnswers} correct`);
+              } else {
+                console.log(`⚠️ Still no category found for attempt, skipping`);
+              }
+            }
+            
+            console.log(`📊 Category stats calculated:`, categoryStats);
+            
+            // Find category with highest accuracy
+            let maxAccuracy = 0;
+            for (const [category, stats] of Object.entries(categoryStats)) {
+              if (stats.total > 0) {
+                const accuracy = stats.correct / stats.total;
+                if (accuracy > maxAccuracy) {
+                  maxAccuracy = accuracy;
+                  bestCategory = category;
+                }
+              }
+            }
+            
+            console.log(`✅ Calculated best category for ${data.userId}: ${bestCategory} (${(maxAccuracy * 100).toFixed(1)}% accuracy)`);
+            
+            // Update the userStats document with the calculated best category
+            if (bestCategory !== data.bestCategory) {
+              try {
+                await updateDoc(docSnapshot.ref, { bestCategory });
+                console.log(`📝 Updated userStats for ${data.userId} with bestCategory: ${bestCategory}`);
+              } catch (updateError) {
+                console.error(`❌ Failed to update bestCategory for ${data.userId}:`, updateError);
+              }
+            }
+          } else {
+            bestCategory = 'No quizzes yet';
+            console.log(`❌ No quiz attempts found for ${data.userId}, setting bestCategory to: ${bestCategory}`);
+          }
+        } else {
+          console.log(`✅ Using existing best category for ${data.userId}: ${data.bestCategory}`);
+        }
+
         leaderboard.push({
           id: docSnapshot.id,
           userId: data.userId,
@@ -962,7 +1199,7 @@ export const leaderboardAPI = {
           weeklyPoints: data.totalPoints, // TODO: Calculate actual weekly points
           accuracy: data.overallAccuracy || 0,
           avgResponseTime: data.avgResponseTime || 0,
-          bestCategory: data.bestCategory || 'sensor',
+          bestCategory: bestCategory,
           currentStreak: data.currentStreak || 0
         });
       }

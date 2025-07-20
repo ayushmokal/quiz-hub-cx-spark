@@ -5,8 +5,8 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { useAuth } from '../../contexts/AuthContext';
-import { dashboardAPI, topicsAPI } from '../../services/api';
-import { Topic, DashboardStats } from '../../types';
+import { dashboardAPI, topicsAPI, quizAPI } from '../../services/api';
+import { Topic, DashboardStats, QuizAttempt } from '../../types';
 
 interface DashboardProps {
   onViewChange: (view: string) => void;
@@ -17,20 +17,30 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [recentAttempts, setRecentAttempts] = useState<QuizAttempt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadDashboardData = useCallback(async () => {
     if (!user) return;
     
     try {
-      console.log('Dashboard: Refreshing data...');
-      const [userStats, availableTopics] = await Promise.all([
+      console.log('📊 Dashboard: Refreshing data for user:', user.id);
+      const [userStats, availableTopics, userAttempts] = await Promise.all([
         dashboardAPI.getUserDashboardStats(user.id),
-        topicsAPI.getTopics()
+        topicsAPI.getTopics(),
+        quizAPI.getUserQuizAttempts(user.id)
       ]);
+      
+      console.log('📊 Dashboard: Loaded stats:', userStats);
+      console.log('📊 Dashboard: Recent attempts:', userAttempts);
       
       setStats(userStats);
       setTopics(availableTopics);
+      // Get the 5 most recent attempts
+      const sortedAttempts = userAttempts
+        .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+        .slice(0, 5);
+      setRecentAttempts(sortedAttempts);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
@@ -44,9 +54,12 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
 
   // Refresh when refreshTrigger changes
   useEffect(() => {
-    if (refreshTrigger) {
+    if (refreshTrigger && refreshTrigger > 0) {
       console.log('Dashboard: Triggered refresh due to refreshTrigger:', refreshTrigger);
-      loadDashboardData();
+      // Add a small delay to ensure backend stats are updated
+      setTimeout(() => {
+        loadDashboardData();
+      }, 1000);
     }
   }, [refreshTrigger, loadDashboardData]);
 
@@ -58,6 +71,32 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
     if (accuracy >= 80) return 'text-[hsl(var(--success))]';
     if (accuracy >= 60) return 'text-[hsl(var(--warning))]';
     return 'text-destructive';
+  };
+
+  const getAccuracyBadgeClass = (accuracy: number) => {
+    if (accuracy >= 80) return 'bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20';
+    if (accuracy >= 60) return 'bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/20';
+    return 'bg-destructive/10 text-destructive border-destructive/20';
+  };
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Just now';
+    if (diffInHours < 24) return `${diffInHours} hour${diffInHours === 1 ? '' : 's'} ago`;
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays === 1) return 'Yesterday';
+    if (diffInDays < 7) return `${diffInDays} days ago`;
+    
+    return date.toLocaleDateString();
+  };
+
+  const getTopicNameById = (topicId: string) => {
+    const topic = topics.find(t => t.id === topicId);
+    return topic?.displayName || 'Unknown Topic';
   };
 
   if (isLoading) {
@@ -93,8 +132,8 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
             </p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-accent">{stats.currentStreak}</div>
-            <div className="text-sm text-muted-foreground">Current Streak</div>
+            <div className="text-2xl font-bold text-accent">{stats.totalPoints.toLocaleString()}</div>
+            <div className="text-sm text-muted-foreground">Total Points</div>
           </div>
         </div>
       </div>
@@ -247,25 +286,27 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium">Sensor Troubleshooting</p>
-                  <p className="text-xs text-muted-foreground">Completed 2 hours ago</p>
+              {recentAttempts.length > 0 ? (
+                recentAttempts.map((attempt) => (
+                  <div key={attempt.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
+                    <div>
+                      <p className="text-sm font-medium">{getTopicNameById(attempt.topicId)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Completed {formatTimeAgo(attempt.completedAt)}
+                      </p>
+                    </div>
+                    <Badge className={getAccuracyBadgeClass(attempt.accuracy)}>
+                      {Math.round(attempt.accuracy)}%
+                    </Badge>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-2">🎯</div>
+                  <p className="text-sm text-muted-foreground">No quiz attempts yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Take your first quiz to see activity here!</p>
                 </div>
-                <Badge className="bg-[hsl(var(--success))]/10 text-[hsl(var(--success))] border-[hsl(var(--success))]/20">
-                  95%
-                </Badge>
-              </div>
-              
-              <div className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium">Payment Processing</p>
-                  <p className="text-xs text-muted-foreground">Completed yesterday</p>
-                </div>
-                <Badge className="bg-[hsl(var(--warning))]/10 text-[hsl(var(--warning))] border-[hsl(var(--warning))]/20">
-                  78%
-                </Badge>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>

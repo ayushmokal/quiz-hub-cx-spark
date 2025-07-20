@@ -202,6 +202,10 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
     setQuizState(prev => ({ ...prev, isSubmitting: true }));
 
     try {
+      console.log('QuizEngine: Submitting quiz results for user:', user.id, {
+        score, accuracy, avgTime, topicId: topic.id
+      });
+      
       await quizAPI.submitQuizAttempt({
         userId: user.id,
         topicId: topic.id,
@@ -212,6 +216,8 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
         avgTime: avgTime,
         streak: 1 // TODO: Calculate actual streak
       });
+
+      console.log('QuizEngine: Quiz results submitted successfully');
 
       toast({
         title: "Quiz Completed!",
@@ -318,11 +324,16 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Try Again
               </Button>
-              <Button onClick={() => {
+              <Button onClick={async () => {
+                console.log('QuizEngine: Back to Dashboard clicked, calling onComplete with:', quizState.score, quizState.accuracy);
+                
+                // Small delay to ensure stats are saved
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
                 onComplete(quizState.score, quizState.accuracy);
                 onExit();
-              }} className="quiz-button-primary">
-                Back to Dashboard
+              }} className="quiz-button-primary" disabled={quizState.isSubmitting}>
+                {quizState.isSubmitting ? 'Saving...' : 'Back to Dashboard'}
               </Button>
             </div>
           </CardContent>

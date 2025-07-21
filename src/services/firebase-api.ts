@@ -186,29 +186,23 @@ export const authAPI = {
       hd: 'ultrahuman.com' // Restrict to ultrahuman.com domain
     });
     
-    // Use redirect to avoid COOP issues completely
     try {
-      await signInWithRedirect(auth, provider);
-      throw new Error('REDIRECT_INITIATED');
-    } catch (error: any) {
-      if (error.message === 'REDIRECT_INITIATED') {
-        throw error; // Re-throw redirect signal
+      const result = await signInWithPopup(auth, provider);
+      
+      // Auto-create user profile if doesn't exist - WAIT for this to complete
+      if (result.user) {
+        await this.ensureUserProfile(result.user);
       }
       
-      // If redirect fails, try popup as fallback with relaxed COOP
-      try {
-        const result = await signInWithPopup(auth, provider);
-        
-        // Auto-create user profile if doesn't exist
-        if (result.user) {
-          await this.ensureUserProfile(result.user);
-        }
-        
-        return result;
-      } catch (popupError: any) {
-        console.error('Both redirect and popup failed:', { redirect: error, popup: popupError });
-        throw popupError;
+      return result;
+    } catch (error: any) {
+      // If popup fails, fallback to redirect
+      if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+        await signInWithRedirect(auth, provider);
+        throw new Error('REDIRECT_INITIATED');
       }
+      
+      throw error;
     }
   },
 
@@ -235,7 +229,15 @@ export const authAPI = {
       throw new Error('Unauthorized: Only @ultrahuman.com emails are allowed');
     }
     
-    return await this.getUserProfile(user.uid);
+    // Try to get existing profile
+    let userProfile = await this.getUserProfile(user.uid);
+    
+    // If profile doesn't exist, create it (this handles the race condition)
+    if (!userProfile) {
+      userProfile = await this.ensureUserProfile(user);
+    }
+    
+    return userProfile;
   },
 
   async getUserProfile(uid: string): Promise<User | null> {

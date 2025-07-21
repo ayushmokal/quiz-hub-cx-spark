@@ -11,13 +11,18 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase with explicit configuration
+const app = initializeApp(firebaseConfig, {
+  // Explicitly disable automatic data collection and hosting features
+  automaticDataCollectionEnabled: false,
+  // Use a unique app name to avoid conflicts
+  name: 'quiz-hub-main'
+});
 
-// Initialize Firebase Auth
+// Initialize Firebase Auth with the named app
 export const auth = getAuth(app);
 
-// Initialize Firestore
+// Initialize Firestore with the named app
 export const db = getFirestore(app);
 
 // Enable emulators in development

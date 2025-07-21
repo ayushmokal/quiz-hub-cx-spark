@@ -20,7 +20,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const initAuth = async () => {
       // Handle redirect result if any
       try {
-        await authAPI.handleRedirectResult();
+        const result = await authAPI.handleRedirectResult();
+        if (result) {
+          // Redirect result processed successfully
+        }
       } catch (error) {
         console.error('Redirect result error:', error);
       }

@@ -492,16 +492,24 @@ export const categoriesAPI = {
     const user = auth.currentUser;
     if (!user) throw new Error('User not authenticated');
     
-    const newCategory = {
+    const newCategory: any = {
       name: category.name,
       displayName: category.displayName,
-      description: category.description,
-      icon: category.icon,
-      color: category.color,
       isActive: category.isActive,
       createdAt: Timestamp.now(),
       createdBy: user.uid
     };
+
+    // Only add optional fields if they have values
+    if (category.description !== undefined && category.description !== '') {
+      newCategory.description = category.description;
+    }
+    if (category.icon !== undefined && category.icon !== '') {
+      newCategory.icon = category.icon;
+    }
+    if (category.color !== undefined && category.color !== '') {
+      newCategory.color = category.color;
+    }
     
     const docRef = await addDoc(collection(db, 'categories'), newCategory);
     
@@ -512,9 +520,9 @@ export const categoriesAPI = {
       id: docRef.id,
       name: newCategory.name,
       displayName: newCategory.displayName,
-      description: newCategory.description,
-      icon: newCategory.icon,
-      color: newCategory.color,
+      description: newCategory.description || '',
+      icon: newCategory.icon || '',
+      color: newCategory.color || '',
       isActive: newCategory.isActive,
       createdAt: newCategory.createdAt.toDate().toISOString(),
       createdBy: newCategory.createdBy
@@ -561,10 +569,102 @@ export const categoriesAPI = {
     const oldDoc = await getDoc(categoryDocRef);
     const oldData = oldDoc.data();
     
-    await deleteDoc(categoryDocRef);
-    
-    // Create audit log
-    await createAuditLog('categories', id, 'DELETE', oldData, null);
+    if (!oldDoc.exists()) {
+      throw new Error('Category not found');
+    }
+
+    try {
+      console.log(`🗑️ Firebase: Starting cascading delete for category: ${id} (${oldData?.displayName})`);
+      
+      // Step 1: Find all topics in this category (use multiple potential category field names)
+      const categoryNames = [
+        oldData?.name,
+        oldData?.displayName, 
+        oldData?.slug,
+        id
+      ].filter(Boolean);
+      
+      console.log(`🔍 Firebase: Searching for topics with category names:`, categoryNames);
+      
+      let allTopicsToDelete: any[] = [];
+      
+      // Search by each potential category identifier
+      for (const categoryName of categoryNames) {
+        const topicsQuery = query(
+          collection(db, 'topics'),
+          where('category', '==', categoryName)
+        );
+        const topicsSnapshot = await getDocs(topicsQuery);
+        
+        if (topicsSnapshot.docs.length > 0) {
+          console.log(`🔍 Firebase: Found ${topicsSnapshot.docs.length} topics with category "${categoryName}"`);
+          allTopicsToDelete.push(...topicsSnapshot.docs);
+        }
+      }
+      
+      // Remove duplicates based on document ID
+      const uniqueTopics = allTopicsToDelete.filter((topic, index, self) => 
+        index === self.findIndex(t => t.id === topic.id)
+      );
+      
+      console.log(`🗑️ Firebase: Total unique topics to delete: ${uniqueTopics.length}`);
+      
+      // Step 2: For each topic, delete all its questions and quiz attempts
+      for (const topicDoc of uniqueTopics) {
+        const topicId = topicDoc.id;
+        const topicData = topicDoc.data();
+        console.log(`🗑️ Firebase: Processing topic: ${topicId} (${topicData?.displayName})`);
+        
+        // Delete all questions for this topic
+        const questionsQuery = query(
+          collection(db, 'questions'),
+          where('topicId', '==', topicId)
+        );
+        const questionsSnapshot = await getDocs(questionsQuery);
+        
+        console.log(`🗑️ Firebase: Found ${questionsSnapshot.docs.length} questions to delete in topic ${topicId}`);
+        
+        const questionDeletePromises = questionsSnapshot.docs.map(questionDoc => {
+          console.log(`🗑️ Firebase: Deleting question: ${questionDoc.id}`);
+          return deleteDoc(doc(db, 'questions', questionDoc.id));
+        });
+        await Promise.all(questionDeletePromises);
+        
+        // Delete quiz attempts for this topic
+        const attemptsQuery = query(
+          collection(db, 'quiz_attempts'),
+          where('topicId', '==', topicId)
+        );
+        const attemptsSnapshot = await getDocs(attemptsQuery);
+        
+        console.log(`🗑️ Firebase: Found ${attemptsSnapshot.docs.length} quiz attempts to delete for topic ${topicId}`);
+        
+        const attemptDeletePromises = attemptsSnapshot.docs.map(attemptDoc => {
+          console.log(`🗑️ Firebase: Deleting quiz attempt: ${attemptDoc.id}`);
+          return deleteDoc(doc(db, 'quiz_attempts', attemptDoc.id));
+        });
+        await Promise.all(attemptDeletePromises);
+        
+        // Delete the topic itself
+        console.log(`🗑️ Firebase: Deleting topic: ${topicId}`);
+        await deleteDoc(doc(db, 'topics', topicId));
+      }
+      
+      // Step 3: Delete the category itself
+      console.log(`🗑️ Firebase: Deleting category: ${id}`);
+      await deleteDoc(categoryDocRef);
+      
+      console.log(`✅ Firebase: Successfully completed cascading delete for category: ${id}`);
+      
+      // Step 5: Create audit log
+      await createAuditLog('categories', id, 'DELETE', oldData, null);
+      
+      console.log(`Successfully completed cascading delete for category: ${id}`);
+      
+    } catch (error) {
+      console.error(`Error during cascading delete for category ${id}:`, error);
+      throw new Error(`Failed to delete category and its content: ${error.message}`);
+    }
   }
 };
 
@@ -595,12 +695,16 @@ export const topicsAPI = {
           };
         })
         .filter(topic => {
-          console.log('Topic status check:', topic.displayName, 'status:', topic.status);
-          return topic.status === 'active';
+          console.log('Topic validation check:', topic.displayName, 'status:', topic.status, 'id:', topic.id);
+          // Double-check that topic has required fields and is truly active
+          return topic.status === 'active' && 
+                 topic.displayName && 
+                 topic.displayName.trim() !== '' &&
+                 topic.id;
         })
         .sort((a, b) => a.displayName.localeCompare(b.displayName));
       
-      console.log('Topics: Found', topics.length, 'active topics after filtering');
+      console.log('Topics: Returning', topics.length, 'validated active topics');
       return topics;
     } catch (error) {
       console.error('Topics: Error fetching topics:', error);

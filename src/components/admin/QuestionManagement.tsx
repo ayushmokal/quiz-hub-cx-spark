@@ -28,6 +28,7 @@ import {
 } from '../ui/alert-dialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/use-toast';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { topicsAPI, questionsAPI, categoriesAPI } from '../../services/api';
 import { Topic, Question, Category } from '../../types';
 
@@ -46,7 +47,7 @@ interface QuestionManagementProps {
   onTopicChange?: (topicId: string | null) => void;
 }
 
-export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionManagementProps) {
+export function QuestionManagement({ selectedTopicId: propSelectedTopicId, onTopicChange }: QuestionManagementProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -58,6 +59,10 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  
+  // Use internal state if no prop is provided (standalone mode)
+  const [internalSelectedTopicId, setInternalSelectedTopicId] = useState<string | undefined>(undefined);
+  const selectedTopicId = propSelectedTopicId || internalSelectedTopicId;
   const [formData, setFormData] = useState<QuestionFormData>({
     type: 'multiple-choice',
     content: '',
@@ -78,12 +83,22 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
   }, [canManageQuestions]);
 
   useEffect(() => {
+    console.log('🔄 QuestionManagement: selectedTopicId changed:', selectedTopicId);
+    console.log('🔄 QuestionManagement: available topics:', topics.map(t => ({id: t.id, name: t.displayName})));
+    
     if (selectedTopicId) {
       const topic = topics.find(t => t.id === selectedTopicId);
+      console.log('🔄 QuestionManagement: found topic for selectedTopicId:', topic);
       if (topic) {
         setCurrentTopic(topic);
         loadQuestions(selectedTopicId);
+      } else {
+        console.warn('🔄 QuestionManagement: Topic not found for selectedTopicId:', selectedTopicId);
+        console.warn('🔄 QuestionManagement: Available topic IDs:', topics.map(t => t.id));
       }
+    } else {
+      console.log('🔄 QuestionManagement: No selectedTopicId, clearing currentTopic');
+      setCurrentTopic(null);
     }
   }, [selectedTopicId, topics]);
 
@@ -140,8 +155,15 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
   };
 
   const handleTopicSelect = (topic: Topic) => {
+    console.log('📋 QuestionManagement: Topic selected:', topic.id, topic.displayName);
     setCurrentTopic(topic);
     loadQuestions(topic.id);
+    
+    // Update internal state if in standalone mode
+    if (!propSelectedTopicId) {
+      setInternalSelectedTopicId(topic.id);
+    }
+    
     if (onTopicChange) {
       onTopicChange(topic.id);
     }
@@ -191,11 +213,18 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
   };
 
   const handleCreateQuestion = async () => {
-    if (!currentTopic) return;
+    if (!selectedTopicId) {
+      toast({
+        title: "Error",
+        description: "No topic selected. Please select a topic first.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
       const newQuestion = await questionsAPI.createQuestion({
-        topicId: currentTopic.id,
+        topicId: selectedTopicId,
         type: formData.type,
         content: formData.content,
         options: formData.options.filter(opt => opt.trim() !== ''),
@@ -238,10 +267,24 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
   };
 
   const handleUpdateQuestion = async () => {
-    if (!editingQuestion) return;
+    if (!editingQuestion || !selectedTopicId) {
+      toast({
+        title: "Error",
+        description: "No topic selected. Please select a topic first.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    console.log('🔧 QuestionManagement: Updating question:', {
+      questionId: editingQuestion.id,
+      topicId: selectedTopicId,
+      formData: formData
+    });
 
     try {
       const updatedQuestion = await questionsAPI.updateQuestion(editingQuestion.id, {
+        topicId: selectedTopicId, // Use selectedTopicId for consistency
         type: formData.type,
         content: formData.content,
         options: formData.options.filter(opt => opt.trim() !== ''),
@@ -272,7 +315,17 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
 
   const handleDeleteQuestion = async (question: Question) => {
     try {
-      await questionsAPI.deleteQuestion(question.id);
+      if (!selectedTopicId) {
+        toast({
+          title: "Error",
+          description: "No topic selected. Please select a topic first.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      console.log('🗑️ QuestionManagement: Deleting question', question.id, 'from topic', selectedTopicId);
+      await questionsAPI.deleteQuestion(selectedTopicId, question.id);
       setQuestions(prev => prev.filter(q => q.id !== question.id));
       
       toast({
@@ -281,6 +334,7 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
         variant: "default"
       });
     } catch (error: any) {
+      console.error('🗑️ QuestionManagement: Error deleting question:', error);
       toast({
         title: "Error Deleting Question",
         description: error.message || "Failed to delete question. Please try again.",
@@ -388,7 +442,14 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
           <Button
             variant="outline"
             onClick={() => {
+              console.log('🔙 QuestionManagement: Back to Topics clicked');
               setCurrentTopic(null);
+              
+              // Clear internal state if in standalone mode
+              if (!propSelectedTopicId) {
+                setInternalSelectedTopicId(undefined);
+              }
+              
               if (onTopicChange) onTopicChange(null);
             }}
           >
@@ -396,20 +457,36 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
             Back to Topics
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">{currentTopic.displayName}</h1>
+            <h1 className="text-2xl font-bold text-foreground">
+              {currentTopic?.displayName || 'Question Management'}
+            </h1>
             <p className="text-muted-foreground">
-              Manage questions for this topic
+              {currentTopic ? 'Manage questions for this topic' : 'Loading topic...'}
             </p>
           </div>
         </div>
         <Button
           className="quiz-button-primary"
           onClick={() => setIsCreateDialogOpen(true)}
+          disabled={!selectedTopicId}
+          title={!selectedTopicId ? "Please select a topic first" : "Add new question"}
         >
           <Plus className="mr-2 h-4 w-4" />
           Add Question
         </Button>
       </div>
+
+      {/* No Topic Selected Message */}
+      {!currentTopic && (
+        <div className="text-center py-8">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mx-auto max-w-md">
+            <h3 className="text-lg font-medium text-blue-900 mb-2">Select a Topic First</h3>
+            <p className="text-blue-700 text-sm">
+              Please select a topic from the dropdown above to start creating questions.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Questions List */}
       <div className="space-y-4">
@@ -664,11 +741,25 @@ export function QuestionManagement({ selectedTopicId, onTopicChange }: QuestionM
             </Button>
             <Button 
               onClick={editingQuestion ? handleUpdateQuestion : handleCreateQuestion}
-              disabled={!formData.content || formData.correctAnswers.length === 0 || formData.options.filter(opt => opt.trim()).length < 2}
+              disabled={
+                !selectedTopicId || 
+                !formData.content || 
+                formData.correctAnswers.length === 0 || 
+                formData.options.filter(opt => opt.trim()).length < 2
+              }
             >
               <Save className="mr-2 h-4 w-4" />
               {editingQuestion ? 'Update Question' : 'Create Question'}
             </Button>
+            {/* Debug info */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 mt-2">
+                Debug: content={!!formData.content}, correctAnswers={formData.correctAnswers.length}, 
+                validOptions={formData.options.filter(opt => opt.trim()).length}, 
+                selectedTopicId={selectedTopicId || 'NONE'}, currentTopic={currentTopic?.displayName || 'NONE'}
+                {!selectedTopicId && <span className="text-red-500"> - NO TOPIC SELECTED!</span>}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

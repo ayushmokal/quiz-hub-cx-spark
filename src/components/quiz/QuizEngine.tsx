@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/use-toast';
 import { Topic, Question } from '../../types';
 import { questionsAPI, quizAPI } from '../../services/api';
+import { QuizResults } from './QuizResults';
 
 interface QuizEngineProps {
   topic: Topic;
@@ -26,6 +27,7 @@ interface QuizState {
   showResults: boolean;
   score: number;
   accuracy: number;
+  avgTime: number;
 }
 
 export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
@@ -42,7 +44,8 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
     isSubmitting: false,
     showResults: false,
     score: 0,
-    accuracy: 0
+    accuracy: 0,
+    avgTime: 0
   });
 
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
@@ -189,7 +192,9 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
     setQuizState(prev => ({
       ...prev,
       score: totalScore,
-      accuracy: accuracy
+      accuracy: accuracy,
+      avgTime: avgTime,
+      showResults: true
     }));
 
     // Submit to backend
@@ -262,10 +267,17 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading quiz...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center p-4">
+        <div className="text-center space-y-6">
+          <div className="relative">
+            <div className="w-20 h-20 border-4 border-slate-200 rounded-full animate-spin">
+              <div className="absolute top-0 left-0 w-20 h-20 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-slate-900">Loading Quiz</h2>
+            <p className="text-slate-600">Preparing your {topic.displayName} questions...</p>
+          </div>
         </div>
       </div>
     );
@@ -273,80 +285,45 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
 
   if (quizState.showResults) {
     return (
-      <div className="max-w-2xl mx-auto">
-        <Card className="quiz-card">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              {quizState.accuracy >= 70 ? (
-                <CheckCircle className="h-16 w-16 text-[hsl(var(--success))]" />
-              ) : (
-                <XCircle className="h-16 w-16 text-destructive" />
-              )}
-            </div>
-            <CardTitle className="text-2xl">Quiz Complete!</CardTitle>
-            <CardDescription>{topic.displayName}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Results Summary */}
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-accent">{quizState.score}</div>
-                <div className="text-sm text-muted-foreground">Points</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-[hsl(var(--success))]">
-                  {quizState.accuracy.toFixed(1)}%
-                </div>
-                <div className="text-sm text-muted-foreground">Accuracy</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-muted-foreground">
-                  {Math.round(quizState.timePerQuestion.reduce((sum, time) => sum + time, 0) / quizState.timePerQuestion.length)}s
-                </div>
-                <div className="text-sm text-muted-foreground">Avg Time</div>
-              </div>
-            </div>
-
-            {/* Performance Message */}
-            <div className="text-center p-4 rounded-lg bg-muted/30">
-              {quizState.accuracy >= 90 ? (
-                <p className="text-[hsl(var(--success))]">🎉 Excellent work! You've mastered this topic.</p>
-              ) : quizState.accuracy >= 70 ? (
-                <p className="text-accent">👍 Good job! You have a solid understanding.</p>
-              ) : (
-                <p className="text-destructive">📚 Keep practicing! Review the explanations and try again.</p>
-              )}
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 justify-center">
-              <Button onClick={handleRetry} variant="outline" disabled={quizState.isSubmitting}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Try Again
-              </Button>
-              <Button onClick={async () => {
-                console.log('QuizEngine: Back to Dashboard clicked, calling onComplete with:', quizState.score, quizState.accuracy);
-                
-                // Small delay to ensure stats are saved
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                onComplete(quizState.score, quizState.accuracy);
-                onExit();
-              }} className="quiz-button-primary" disabled={quizState.isSubmitting}>
-                {quizState.isSubmitting ? 'Saving...' : 'Back to Dashboard'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <QuizResults
+        questions={quizState.questions}
+        userAnswers={quizState.answers}
+        score={quizState.score}
+        accuracy={quizState.accuracy}
+        avgTime={quizState.avgTime}
+        topicName={topic.displayName}
+        onReturnToDashboard={async () => {
+          console.log('QuizEngine: Back to Dashboard clicked, calling onComplete with:', quizState.score, quizState.accuracy);
+          
+          // Small delay to ensure stats are saved
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          onComplete(quizState.score, quizState.accuracy);
+          onExit();
+        }}
+        onRetakeQuiz={handleRetry}
+      />
     );
   }
 
   if (!currentQuestion) {
     return (
-      <div className="text-center">
-        <p>No questions available for this topic.</p>
-        <Button onClick={onExit} className="mt-4">Back to Topics</Button>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center p-4">
+        <div className="text-center space-y-6">
+          <div className="w-16 h-16 bg-slate-200 rounded-2xl flex items-center justify-center">
+            <XCircle className="w-8 h-8 text-slate-500" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-slate-900">No Questions Available</h2>
+            <p className="text-slate-600">This topic doesn't have any questions yet.</p>
+          </div>
+          <button
+            onClick={onExit}
+            className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
+          >
+            Back to Topics
+          </button>
+        </div>
       </div>
     );
   }
@@ -354,77 +331,144 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
   const progress = ((quizState.currentQuestionIndex) / quizState.questions.length) * 100;
 
   return (
-    <div className="max-w-3xl mx-auto">
-      {/* Quiz Header */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{topic.displayName}</h1>
-            <p className="text-muted-foreground">
-              Question {quizState.currentQuestionIndex + 1} of {quizState.questions.length}
-            </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Modern Header */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3">
+                <div className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full font-bold text-sm">
+                  Q{quizState.currentQuestionIndex + 1}
+                </div>
+                <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
+                  {topic.displayName}
+                </h1>
+              </div>
+              <p className="text-slate-500 text-lg font-medium">
+                Question {quizState.currentQuestionIndex + 1} of {quizState.questions.length}
+              </p>
+            </div>
+            
+            {/* Status Pills */}
+            <div className="flex items-center space-x-3">
+              <div className={`px-4 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
+                timeLeft <= 10 
+                  ? 'bg-red-100 text-red-700 ring-2 ring-red-200 animate-pulse' 
+                  : 'bg-slate-100 text-slate-700'
+              }`}>
+                <Clock className="inline mr-2 h-4 w-4" />
+                {timeLeft}s
+              </div>
+              <div className="px-4 py-2 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 rounded-full font-semibold text-sm">
+                {currentQuestion.difficulty}
+              </div>
+            </div>
           </div>
-          <div className="flex items-center space-x-4">
-            <Badge variant={timeLeft <= 10 ? "destructive" : "secondary"}>
-              <Clock className="mr-1 h-3 w-3" />
-              {timeLeft}s
-            </Badge>
-            <Badge className={`category-${topic.category}`}>
-              {currentQuestion.difficulty}
-            </Badge>
+          
+          {/* Progress Bar */}
+          <div className="relative">
+            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="absolute -top-1 right-0 transform translate-x-2">
+              <div className="w-4 h-4 bg-white border-2 border-blue-500 rounded-full shadow-sm" />
+            </div>
           </div>
         </div>
-        <Progress value={progress} className="h-2" />
-      </div>
 
-      {/* Question Card */}
-      <Card className="quiz-card mb-6">
-        <CardHeader>
-          <CardTitle className="text-lg leading-relaxed">
-            {currentQuestion.content}
-          </CardTitle>
-          {currentQuestion.type === 'multi-select' && (
-            <CardDescription>
-              Select all that apply
-            </CardDescription>
-          )}
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {currentQuestion.options.map((option, index) => (
-              <Button
-                key={index}
-                variant={selectedAnswers.includes(index) ? "default" : "outline"}
-                className={`w-full text-left justify-start p-4 h-auto whitespace-normal ${
-                  selectedAnswers.includes(index) 
-                    ? 'bg-gradient-to-r from-accent to-[hsl(267_100%_70%)] text-white' 
-                    : 'hover:bg-muted/50'
-                }`}
-                onClick={() => handleAnswerSelect(index)}
-              >
-                <span className="mr-3 flex-shrink-0 w-6 h-6 rounded-full border border-current flex items-center justify-center text-sm">
-                  {selectedAnswers.includes(index) ? '✓' : String.fromCharCode(65 + index)}
-                </span>
-                <span className="flex-1">{option}</span>
-              </Button>
-            ))}
+        {/* Question Card - Ultra Modern Design */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl transform rotate-1 opacity-5" />
+          <div className="relative bg-white rounded-3xl shadow-xl border border-slate-200/50 overflow-hidden">
+            {/* Card Header */}
+            <div className="p-8 md:p-10 border-b border-slate-100">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">
+                    {quizState.currentQuestionIndex + 1}
+                  </span>
+                </div>
+                {currentQuestion.type === 'multi-select' && (
+                  <div className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">
+                    Select all that apply
+                  </div>
+                )}
+              </div>
+              
+              <h2 className="text-2xl md:text-3xl font-bold text-slate-900 leading-relaxed">
+                {currentQuestion.content}
+              </h2>
+            </div>
+
+            {/* Answer Options */}
+            <div className="p-8 md:p-10 space-y-4">
+              {currentQuestion.options.map((option, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleAnswerSelect(index)}
+                  className={`group w-full text-left p-6 rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.01] ${
+                    selectedAnswers.includes(index)
+                      ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg ring-4 ring-blue-100'
+                      : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
+                  }`}
+                >
+                  <div className="flex items-center space-x-4">
+                    <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-semibold transition-all duration-200 ${
+                      selectedAnswers.includes(index)
+                        ? 'border-blue-500 bg-blue-500 text-white'
+                        : 'border-slate-300 text-slate-600 group-hover:border-slate-400'
+                    }`}>
+                      {selectedAnswers.includes(index) ? (
+                        <CheckCircle className="w-5 h-5" />
+                      ) : (
+                        <span className="text-sm">{String.fromCharCode(65 + index)}</span>
+                      )}
+                    </div>
+                    <span className={`flex-1 text-lg font-medium transition-colors duration-200 ${
+                      selectedAnswers.includes(index) ? 'text-slate-900' : 'text-slate-700'
+                    }`}>
+                      {option}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {/* Navigation */}
-      <div className="flex justify-between">
-        <Button onClick={onExit} variant="outline">
-          Exit Quiz
-        </Button>
-        <Button 
-          onClick={handleNextQuestion}
-          disabled={selectedAnswers.length === 0}
-          className="quiz-button-primary"
-        >
-          {quizState.currentQuestionIndex >= quizState.questions.length - 1 ? 'Finish Quiz' : 'Next Question'}
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+        {/* Navigation - Modern Floating Bar */}
+        <div className="mt-8 flex justify-between items-center">
+          <button
+            onClick={onExit}
+            className="px-6 py-3 text-slate-600 hover:text-slate-900 font-semibold transition-colors duration-200 hover:bg-slate-100 rounded-xl"
+          >
+            Exit Quiz
+          </button>
+          
+          <div className="flex items-center space-x-4">
+            <div className="text-sm text-slate-500 font-medium">
+              {selectedAnswers.length === 0 ? 'Select an answer to continue' : 'Ready to proceed'}
+            </div>
+            <button
+              onClick={handleNextQuestion}
+              disabled={selectedAnswers.length === 0}
+              className={`px-8 py-3 rounded-xl font-semibold text-white transition-all duration-200 transform ${
+                selectedAnswers.length === 0
+                  ? 'bg-slate-300 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 shadow-lg hover:shadow-xl'
+              }`}
+            >
+              <span className="flex items-center">
+                {quizState.currentQuestionIndex >= quizState.questions.length - 1 ? 'Finish Quiz' : 'Next Question'}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );

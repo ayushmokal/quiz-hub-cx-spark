@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle, AlertCircle, Download, X, RefreshCw } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Label } from '../ui/label';
@@ -45,6 +45,12 @@ export function QuizImport() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset state on component mount to clear any stale values
+  useEffect(() => {
+    setDefaultCategory('');
+    setDefaultTopic('');
+  }, []);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -90,10 +96,34 @@ export function QuizImport() {
 
   const parseCSV = (content: string): QuizRow[] => {
     const lines = content.split('\n').filter(line => line.trim());
-    const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+    
+    // Better CSV parsing that handles quoted fields
+    const parseCSVLine = (line: string): string[] => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      
+      result.push(current.trim());
+      return result;
+    };
+    
+    const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/"/g, ''));
     
     return lines.slice(1).map((line, index) => {
-      const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+      const values = parseCSVLine(line).map(v => v.replace(/^"|"$/g, ''));
       const row: any = {};
       
       headers.forEach((header, i) => {
@@ -109,8 +139,8 @@ export function QuizImport() {
         option_d: row.option_d || row.d || row['option d'] || '',
         correct_answer: row.correct_answer || row.answer || row.correct || '',
         explanation: row.explanation || row.notes || '',
-        topic: row.topic || row.subject || defaultTopic,
-        category: row.category || row.type || defaultCategory,
+        topic: row.topic || row.subject || '',
+        category: row.category || row.type || '',
         difficulty: row.difficulty || row.level || 'intermediate'
       };
     }).filter(row => row.question && row.option_a && row.correct_answer);
@@ -143,81 +173,79 @@ export function QuizImport() {
     }
   };
 
-  const createMissingEntities = async (data: QuizRow[]) => {
-    const result = { newTopics: [], newCategories: [] } as ImportResult;
+  const validateQuestionData = (data: QuizRow[]) => {
+    const validationErrors: string[] = [];
     
     // Get unique topics and categories from the data
     const uniqueTopics = [...new Set(data.map(row => row.topic).filter(Boolean))];
     const uniqueCategories = [...new Set(data.map(row => row.category).filter(Boolean))];
     
-    // Check which topics don't exist
-    for (const topicName of uniqueTopics) {
-      const existingTopic = topics.find(t => t.displayName.toLowerCase() === topicName.toLowerCase());
-      if (!existingTopic) {
-        try {
-          await topicsAPI.createTopic({
-            displayName: topicName,
-            slug: topicName.toLowerCase().replace(/\s+/g, '-'),
-            description: `Auto-created during quiz import`,
-            category: uniqueCategories[0] || 'general',
-            status: 'active'
-          });
-          result.newTopics.push(topicName);
-          toast({
-            title: "Topic Created",
-            description: `Created new topic: ${topicName}`,
-          });
-        } catch (error) {
-          console.error(`Failed to create topic ${topicName}:`, error);
-        }
-      }
-    }
-
-    // Check which categories don't exist
+    // Debug logging
+    console.log('🔍 Validation Debug:');
+    console.log('Available categories:', categories.map(c => ({ id: c.id, name: c.name })));
+    console.log('Available topics:', topics.map(t => ({ id: t.id, name: t.displayName, categoryId: t.categoryId, categoryName: t.categoryName })));
+    console.log('Required categories from CSV:', uniqueCategories);
+    console.log('Required topics from CSV:', uniqueTopics);
+    
+    // Check if all categories exist
     for (const categoryName of uniqueCategories) {
       const existingCategory = categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+      console.log(`Checking category "${categoryName}": ${existingCategory ? 'EXISTS' : 'NOT FOUND'}`);
+      if (existingCategory) {
+        console.log('Found category:', existingCategory);
+      }
       if (!existingCategory) {
-        try {
-          await categoriesAPI.createCategory({
-            name: categoryName,
-            displayName: categoryName,
-            description: `Auto-created during quiz import`,
-            color: '#3B82F6', // Default blue color
-            isActive: true
-          });
-          result.newCategories.push(categoryName);
-          toast({
-            title: "Category Created",
-            description: `Created new category: ${categoryName}`,
-          });
-        } catch (error) {
-          console.error(`Failed to create category ${categoryName}:`, error);
-        }
+        validationErrors.push(`Category "${categoryName}" does not exist. Please create it first.`);
       }
     }
 
-    // Refresh the categories and topics
-    await loadCategoriesAndTopics();
+    // Check if all topics exist
+    for (const topicName of uniqueTopics) {
+      const existingTopic = topics.find(t => t.displayName.toLowerCase() === topicName.toLowerCase());
+      console.log(`Checking topic "${topicName}": ${existingTopic ? 'EXISTS' : 'NOT FOUND'}`);
+      if (existingTopic) {
+        console.log('Found topic:', existingTopic);
+      }
+      if (!existingTopic) {
+        validationErrors.push(`Topic "${topicName}" does not exist. Please create it first.`);
+      }
+    }
     
-    return result;
+    console.log('Validation errors:', validationErrors);
+    return validationErrors;
   };
 
   const handleImport = async () => {
     if (!selectedFile || previewData.length === 0) return;
 
+    // Validate that all topics and categories exist
+    const validationErrors = validateQuestionData(previewData);
+    if (validationErrors.length > 0) {
+      toast({
+        title: "Validation Failed",
+        description: "Some topics or categories don't exist. Please create them first.",
+        variant: "destructive"
+      });
+      setImportResult({
+        success: 0,
+        failed: previewData.length,
+        errors: validationErrors,
+        newTopics: [],
+        newCategories: []
+      });
+      return;
+    }
+
     setIsImporting(true);
     setImportProgress(0);
     
     try {
-      // First create missing topics and categories
-      const entityResult = await createMissingEntities(previewData);
-      
       const result: ImportResult = {
         success: 0,
         failed: 0,
         errors: [],
-        newTopics: entityResult.newTopics,
-        newCategories: entityResult.newCategories
+        newTopics: [],
+        newCategories: []
       };
 
       // Import questions
@@ -330,14 +358,24 @@ export function QuizImport() {
           <h2 className="text-2xl font-bold text-foreground">Bulk Quiz Import</h2>
           <p className="text-muted-foreground">Import quiz questions from CSV or Excel files</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={downloadTemplate}
-          className="flex items-center gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Download Template
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={loadCategoriesAndTopics}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh Topics
+          </Button>
+          <Button
+            variant="outline"
+            onClick={downloadTemplate}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download Template
+          </Button>
+        </div>
       </div>
 
       {/* Upload Section */}
@@ -352,40 +390,6 @@ export function QuizImport() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Default Values */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="defaultCategory">Default Category</Label>
-              <Select value={defaultCategory} onValueChange={setDefaultCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select default category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.name}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="defaultTopic">Default Topic</Label>
-              <Select value={defaultTopic} onValueChange={setDefaultTopic}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select default topic" />
-                </SelectTrigger>
-                <SelectContent>
-                  {topics.map((topic) => (
-                    <SelectItem key={topic.id} value={topic.displayName}>
-                      {topic.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
           {/* File Upload */}
           <div className="space-y-2">
             <Label htmlFor="quizFile">Quiz File</Label>
@@ -409,6 +413,15 @@ export function QuizImport() {
               )}
             </div>
           </div>
+
+          {/* Important Notice */}
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <strong>Important:</strong> Make sure all categories and topics mentioned in your CSV file already exist in the system. 
+              The import will fail if any category or topic is missing.
+            </AlertDescription>
+          </Alert>
 
           {selectedFile && (
             <Alert>
@@ -440,7 +453,7 @@ export function QuizImport() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <p className="text-sm text-muted-foreground">
-                  Review the questions before importing. Missing topics/categories will be created automatically.
+                  Review the questions before importing. All topics and categories must already exist.
                 </p>
                 <Button
                   onClick={handleImport}

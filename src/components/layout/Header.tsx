@@ -16,9 +16,9 @@ export function Header() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'admin': return 'text-[#FF0000]';
-      case 'coach': return 'text-[#FD9400]';
-      case 'agent': return 'text-[#08a104]';
+      case 'admin': return 'text-black';
+      case 'coach': return 'text-gray-700';
+      case 'agent': return 'text-gray-600';
       default: return 'text-[#46494D]';
     }
   };
@@ -28,7 +28,7 @@ export function Header() {
       <div className="container flex h-14 md:h-16 items-center justify-between px-4 lg:px-6">
         {/* Logo */}
         <div className="flex items-center space-x-2 md:space-x-3">
-          <div className="p-1.5 md:p-2 bg-gradient-to-r from-[#FF0000] to-[#FF4500] rounded-lg shadow-lg">
+          <div className="p-1.5 md:p-2 bg-black rounded-lg shadow-lg">
             <Brain className="h-4 w-4 md:h-5 md:w-5 text-white" />
           </div>
           <div>
@@ -43,7 +43,7 @@ export function Header() {
             <Button variant="ghost" className="relative h-9 w-9 md:h-10 md:w-10 rounded-full hover:bg-[#F5F5F5]">
               <Avatar className="h-9 w-9 md:h-10 md:w-10">
                 <AvatarImage src={user?.avatar} alt={user?.name} />
-                <AvatarFallback className="bg-gradient-to-r from-[#FF0000] to-[#FF4500] text-white text-sm font-medium">
+                <AvatarFallback className="bg-black text-white text-sm font-medium">
                   {user?.name?.split(' ').map(n => n[0]).join('').toUpperCase()}
                 </AvatarFallback>
               </Avatar>
@@ -69,7 +69,7 @@ export function Header() {
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-[#46494D]/10" />
-            <DropdownMenuItem onClick={logout} className="text-[#FF0000] hover:bg-[#FF0000]/5 cursor-pointer">
+            <DropdownMenuItem onClick={logout} className="text-black hover:bg-gray-100 cursor-pointer">
               <LogOut className="mr-2 h-4 w-4" />
               Sign Out
             </DropdownMenuItem>

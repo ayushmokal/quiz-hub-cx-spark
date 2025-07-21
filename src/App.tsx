@@ -5,6 +5,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { GlobalStateProvider } from './contexts/GlobalStateContext';
 import { LoginPage } from './components/auth/LoginPage';
 import { Header } from './components/layout/Header';
 import { Navigation } from './components/layout/Navigation';
@@ -18,6 +19,7 @@ import { CategoryManagement } from './components/admin/CategoryManagement';
 import { AuditLogViewer } from './components/admin/AuditLogViewer';
 import { UserManagement } from './components/admin/UserManagement';
 import { QuizImport } from './components/admin/QuizImport';
+import { Settings } from './components/admin/Settings';
 import { Topic } from './types';
 
 const queryClient = new QueryClient();
@@ -82,14 +84,7 @@ function MainApp() {
       case 'quiz-import':
         return <QuizImport />;
       case 'settings':
-        return (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-foreground mb-2">Settings</h2>
-              <p className="text-muted-foreground">Coming soon in V2</p>
-            </div>
-          </div>
-        );
+        return <Settings />;
       default:
         return <Dashboard onViewChange={setCurrentView} refreshTrigger={dashboardRefreshTrigger} />;
     }
@@ -113,7 +108,7 @@ function MainApp() {
           <button
             onClick={() => setCurrentView('dashboard')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-              currentView === 'dashboard' ? 'text-[#FF0000] bg-[#FF0000]/5' : 'text-[#46494D]'
+              currentView === 'dashboard' ? 'text-black bg-black/5' : 'text-[#46494D]'
             }`}
           >
             <Home className="w-5 h-5" />
@@ -122,7 +117,7 @@ function MainApp() {
           <button
             onClick={() => setCurrentView('quiz')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-              currentView === 'quiz' ? 'text-[#FF0000] bg-[#FF0000]/5' : 'text-[#46494D]'
+              currentView === 'quiz' ? 'text-black bg-black/5' : 'text-[#46494D]'
             }`}
           >
             <Play className="w-5 h-5" />
@@ -131,7 +126,7 @@ function MainApp() {
           <button
             onClick={() => setCurrentView('leaderboard')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
-              currentView === 'leaderboard' ? 'text-[#FF0000] bg-[#FF0000]/5' : 'text-[#46494D]'
+              currentView === 'leaderboard' ? 'text-black bg-black/5' : 'text-[#46494D]'
             }`}
           >
             <Trophy className="w-5 h-5" />
@@ -146,11 +141,13 @@ function MainApp() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <MainApp />
-      </TooltipProvider>
+      <GlobalStateProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <MainApp />
+        </TooltipProvider>
+      </GlobalStateProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

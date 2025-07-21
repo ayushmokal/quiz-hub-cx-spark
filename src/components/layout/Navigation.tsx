@@ -51,7 +51,7 @@ export function Navigation({ currentView, onViewChange }: NavigationProps) {
               variant={isActive ? "default" : "ghost"}
               className={`w-full justify-start rounded-xl transition-all duration-200 ${
                 isActive 
-                  ? 'bg-gradient-to-r from-[#FF0000] to-[#FF4500] text-white shadow-lg font-medium' 
+                  ? 'bg-black text-white shadow-lg font-medium' 
                   : 'hover:bg-[#F5F5F5] text-[#212121] hover:text-black'
               }`}
               onClick={() => onViewChange(item.id)}

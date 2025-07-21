@@ -28,6 +28,7 @@ import {
 } from '../ui/alert-dialog';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../hooks/use-toast';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { topicsAPI, categoriesAPI } from '../../services/api';
 import { Topic, Category } from '../../types';
 

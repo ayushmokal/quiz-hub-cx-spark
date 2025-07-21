@@ -50,18 +50,31 @@ service cloud.firestore {
       allow read: if isAuthenticated() && isValidUltrahumanEmail();
       allow create, update, delete: if isCoachOrAdmin();
       
-      // Questions subcollection
+      // Questions subcollection (legacy support)
       match /questions/{questionId} {
         allow read: if isAuthenticated() && isValidUltrahumanEmail();
         allow create, update, delete: if isCoachOrAdmin();
       }
     }
     
+    // Questions as top-level collection (current implementation)
+    match /questions/{questionId} {
+      allow read: if isAuthenticated() && isValidUltrahumanEmail();
+      allow create, update, delete: if isCoachOrAdmin();
+    }
+    
     // Quiz attempts - users can create their own, coaches/admins can read all
+    match /quiz_attempts/{attemptId} {
+      allow read: if isAuthenticated() && isValidUltrahumanEmail();
+      allow create: if isAuthenticated() && isValidUltrahumanEmail();
+      allow update, delete: if isCoachOrAdmin(); // Allow coaches/admins to manage attempts
+    }
+    
+    // Quiz attempts (legacy collection name)
     match /quizAttempts/{attemptId} {
       allow read: if isAuthenticated() && isValidUltrahumanEmail();
       allow create: if isAuthenticated() && isValidUltrahumanEmail();
-      allow update, delete: if false; // Quiz attempts are immutable
+      allow update, delete: if isCoachOrAdmin(); // Allow coaches/admins to manage attempts
     }
     
     // User stats - users can read/write their own, coaches/admins can read all

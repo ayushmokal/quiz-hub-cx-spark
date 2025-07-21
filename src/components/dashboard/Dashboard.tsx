@@ -5,6 +5,7 @@ import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
 import { useAuth } from '../../contexts/AuthContext';
+import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { dashboardAPI, topicsAPI, quizAPI } from '../../services/api';
 import { Topic, DashboardStats, QuizAttempt } from '../../types';
 
@@ -15,6 +16,12 @@ interface DashboardProps {
 
 export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
   const { user } = useAuth();
+  const { 
+    dashboardNeedsRefresh, 
+    topicsNeedRefresh, 
+    markDashboardFresh, 
+    markTopicsFresh 
+  } = useGlobalState();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [recentAttempts, setRecentAttempts] = useState<QuizAttempt[]>([]);
@@ -25,34 +32,71 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
     
     try {
       console.log('📊 Dashboard: Refreshing data for user:', user.id);
-      const [userStats, availableTopics, userAttempts] = await Promise.all([
+      
+      // Load data with error handling for each API call
+      const [userStats, availableTopics, userAttempts] = await Promise.allSettled([
         dashboardAPI.getUserDashboardStats(user.id),
         topicsAPI.getTopics(),
         quizAPI.getUserQuizAttempts(user.id)
       ]);
       
-      console.log('📊 Dashboard: Loaded stats:', userStats);
-      console.log('📊 Dashboard: Recent attempts:', userAttempts);
+      // Handle user stats
+      if (userStats.status === 'fulfilled') {
+        console.log('📊 Dashboard: Loaded stats:', userStats.value);
+        setStats(userStats.value);
+      } else {
+        console.error('📊 Dashboard: Failed to load user stats:', userStats.reason);
+        setStats(null);
+      }
       
-      setStats(userStats);
-      setTopics(availableTopics);
-      // Get the 5 most recent attempts
-      const sortedAttempts = userAttempts
-        .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
-        .slice(0, 5);
-      setRecentAttempts(sortedAttempts);
+      // Handle topics
+      if (availableTopics.status === 'fulfilled') {
+        console.log('📊 Dashboard: Loaded topics:', availableTopics.value.length);
+        setTopics(availableTopics.value);
+      } else {
+        console.error('📊 Dashboard: Failed to load topics:', availableTopics.reason);
+        setTopics([]);
+      }
+      
+      // Handle quiz attempts
+      if (userAttempts.status === 'fulfilled') {
+        console.log('📊 Dashboard: Recent attempts:', userAttempts.value);
+        // Get the 5 most recent attempts
+        const sortedAttempts = userAttempts.value
+          .sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime())
+          .slice(0, 5);
+        setRecentAttempts(sortedAttempts);
+      } else {
+        console.error('📊 Dashboard: Failed to load quiz attempts:', userAttempts.reason);
+        setRecentAttempts([]);
+      }
+      
+      // Mark data as fresh in global state
+      markDashboardFresh();
+      markTopicsFresh();
     } catch (error) {
       console.error('Error loading dashboard data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, markDashboardFresh, markTopicsFresh]);
 
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
 
-  // Refresh when refreshTrigger changes
+  // Listen for global state changes
+  useEffect(() => {
+    if (dashboardNeedsRefresh || topicsNeedRefresh) {
+      console.log('📊 Dashboard: Global state triggered refresh', { 
+        dashboardNeedsRefresh, 
+        topicsNeedRefresh 
+      });
+      loadDashboardData();
+    }
+  }, [dashboardNeedsRefresh, topicsNeedRefresh, loadDashboardData]);
+
+  // Refresh when refreshTrigger changes (legacy support)
   useEffect(() => {
     if (refreshTrigger && refreshTrigger > 0) {
       console.log('Dashboard: Triggered refresh due to refreshTrigger:', refreshTrigger);
@@ -119,36 +163,36 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 md:space-y-6 animate-fade-in">
       {/* Welcome Header */}
-      <div className="quiz-card p-6">
-        <div className="flex items-center justify-between">
+      <div className="quiz-card p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">
+            <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
               Hello, {user?.name?.split(' ')[0]} 👋
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm md:text-base">
               Ready to level up your customer experience skills today?
             </p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-accent">{stats.totalPoints.toLocaleString()}</div>
-            <div className="text-sm text-muted-foreground">Total Points</div>
+            <div className="text-xl md:text-2xl font-bold text-accent">{stats.totalPoints.toLocaleString()}</div>
+            <div className="text-xs md:text-sm text-muted-foreground">Total Points</div>
           </div>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card className="quiz-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Points</CardTitle>
-            <Trophy className="h-4 w-4 text-[hsl(var(--warning))]" />
+            <CardTitle className="text-xs md:text-sm font-medium">Total Points</CardTitle>
+            <Trophy className="h-3 w-3 md:h-4 md:w-4 text-[hsl(var(--warning))]" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.totalPoints.toLocaleString()}</div>
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className="text-lg md:text-2xl font-bold text-foreground">{stats.totalPoints.toLocaleString()}</div>
             <p className="text-xs text-[hsl(var(--success))] flex items-center mt-1">
-              <TrendingUp className="h-3 w-3 mr-1" />
+              <TrendingUp className="h-2 w-2 md:h-3 md:w-3 mr-1" />
               +12% from last week
             </p>
           </CardContent>
@@ -156,24 +200,24 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
 
         <Card className="quiz-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Overall Accuracy</CardTitle>
-            <Target className="h-4 w-4 text-[hsl(var(--success))]" />
+            <CardTitle className="text-xs md:text-sm font-medium">Overall Accuracy</CardTitle>
+            <Target className="h-3 w-3 md:h-4 md:w-4 text-[hsl(var(--success))]" />
           </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${getAccuracyColor(stats.overallAccuracy)}`}>
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className={`text-lg md:text-2xl font-bold ${getAccuracyColor(stats.overallAccuracy)}`}>
               {stats.overallAccuracy}%
             </div>
-            <Progress value={stats.overallAccuracy} className="mt-2" />
+            <Progress value={stats.overallAccuracy} className="mt-2 h-1 md:h-2" />
           </CardContent>
         </Card>
 
         <Card className="quiz-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Response Time</CardTitle>
-            <Clock className="h-4 w-4 text-accent" />
+            <CardTitle className="text-xs md:text-sm font-medium">Avg Response Time</CardTitle>
+            <Clock className="h-3 w-3 md:h-4 md:w-4 text-accent" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">{stats.avgResponseTime}s</div>
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className="text-lg md:text-2xl font-bold text-foreground">{stats.avgResponseTime}s</div>
             <p className="text-xs text-muted-foreground mt-1">
               Target: &lt;25s
             </p>
@@ -182,11 +226,11 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
 
         <Card className="quiz-card">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Current Streak</CardTitle>
-            <Zap className="h-4 w-4 text-[hsl(var(--warning))]" />
+            <CardTitle className="text-xs md:text-sm font-medium">Current Streak</CardTitle>
+            <Zap className="h-3 w-3 md:h-4 md:w-4 text-[hsl(var(--warning))]" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-[hsl(var(--warning))]">{stats.currentStreak}</div>
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className="text-lg md:text-2xl font-bold text-[hsl(var(--warning))]">{stats.currentStreak}</div>
             <p className="text-xs text-muted-foreground mt-1">
               Best: 15 questions
             </p>
@@ -196,39 +240,39 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
 
       {/* Topics Grid */}
       <Card className="quiz-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
+        <CardHeader className="p-3 md:p-6">
+          <CardTitle className="text-base md:text-lg flex items-center gap-2">
+            <BookOpen className="h-4 w-4 md:h-5 md:w-5" />
             Knowledge Topics
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs md:text-sm">
             Track your progress across different CX domains
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <CardContent className="p-3 md:p-6 pt-0">
+          <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {topics.slice(0, 6).map((topic) => (
               <div
                 key={topic.id}
-                className="p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer group"
+                className="p-3 md:p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors cursor-pointer group"
                 onClick={() => onViewChange('quiz')}
               >
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="font-semibold text-foreground group-hover:text-accent transition-colors">
+                <div className="flex items-start justify-between mb-2 md:mb-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm md:text-base font-semibold text-foreground group-hover:text-accent transition-colors truncate">
                       {topic.displayName}
                     </h3>
-                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                    <p className="text-xs md:text-sm text-muted-foreground mt-1 line-clamp-2">
                       {topic.description}
                     </p>
                   </div>
-                  <Badge className={getCategoryClass(topic.category)}>
+                  <Badge className={`${getCategoryClass(topic.category)} text-xs ml-2 flex-shrink-0`}>
                     {topic.category}
                   </Badge>
                 </div>
                 
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
+                <div className="space-y-1 md:space-y-2">
+                  <div className="flex justify-between text-xs md:text-sm">
                     <span className="text-muted-foreground">Accuracy</span>
                     <span className={getAccuracyColor(topic.averageAccuracy)}>
                       {topic.averageAccuracy}%
@@ -236,7 +280,7 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
                   </div>
                   <Progress 
                     value={topic.averageAccuracy} 
-                    className="h-2"
+                    className="h-1 md:h-2"
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
                     <span>{topic.questionCount} questions</span>
@@ -250,60 +294,64 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
       </Card>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:gap-4 grid-cols-1 md:grid-cols-2">
         <Card className="quiz-card">
-          <CardHeader>
-            <CardTitle>Quick Quiz</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-3 md:p-6">
+            <CardTitle className="text-base md:text-lg">Quick Quiz</CardTitle>
+            <CardDescription className="text-xs md:text-sm">
               Jump into a focused practice session
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="p-3 md:p-6 pt-0 space-y-2 md:space-y-3">
             <Button 
               onClick={() => onViewChange('quiz')}
-              className="w-full quiz-button-primary"
+              className="w-full quiz-button-primary h-auto py-2 md:py-3"
             >
-              <Play className="mr-2 h-4 w-4" />
-              Start Random Quiz
+              <Play className="mr-2 h-3 w-3 md:h-4 md:w-4" />
+              <div className="text-left">
+                <div className="text-xs md:text-sm font-medium">Start Random Quiz</div>
+              </div>
             </Button>
             <Button 
               onClick={() => onViewChange('leaderboard')}
               variant="outline" 
-              className="w-full"
+              className="w-full h-auto py-2 md:py-3"
             >
-              <Trophy className="mr-2 h-4 w-4" />
-              View Leaderboard
+              <Trophy className="mr-2 h-3 w-3 md:h-4 md:w-4" />
+              <div className="text-left">
+                <div className="text-xs md:text-sm font-medium">View Leaderboard</div>
+              </div>
             </Button>
           </CardContent>
         </Card>
 
         <Card className="quiz-card">
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-3 md:p-6">
+            <CardTitle className="text-base md:text-lg">Recent Activity</CardTitle>
+            <CardDescription className="text-xs md:text-sm">
               Your latest quiz attempts and achievements
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+          <CardContent className="p-3 md:p-6 pt-0">
+            <div className="space-y-2 md:space-y-3">
               {recentAttempts.length > 0 ? (
                 recentAttempts.map((attempt) => (
-                  <div key={attempt.id} className="flex items-center justify-between p-3 bg-muted/20 rounded-lg">
-                    <div>
-                      <p className="text-sm font-medium">{getTopicNameById(attempt.topicId)}</p>
+                  <div key={attempt.id} className="flex items-center justify-between p-2 md:p-3 bg-muted/20 rounded-lg">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs md:text-sm font-medium truncate">{getTopicNameById(attempt.topicId)}</p>
                       <p className="text-xs text-muted-foreground">
                         Completed {formatTimeAgo(attempt.completedAt)}
                       </p>
                     </div>
-                    <Badge className={getAccuracyBadgeClass(attempt.accuracy)}>
+                    <Badge className={`${getAccuracyBadgeClass(attempt.accuracy)} text-xs ml-2 flex-shrink-0`}>
                       {Math.round(attempt.accuracy)}%
                     </Badge>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8">
-                  <div className="text-4xl mb-2">🎯</div>
-                  <p className="text-sm text-muted-foreground">No quiz attempts yet</p>
+                <div className="text-center py-6 md:py-8">
+                  <div className="text-2xl md:text-4xl mb-2">🎯</div>
+                  <p className="text-xs md:text-sm text-muted-foreground">No quiz attempts yet</p>
                   <p className="text-xs text-muted-foreground mt-1">Take your first quiz to see activity here!</p>
                 </div>
               )}

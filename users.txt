@@ -1,1 +1,40 @@
-abdullah.abdullateef@ultrahuman.com, abhimanyu.singh@ultrahuman.com, abhishek.yadav@ultrahuman.com, adi@ultrahuman.com, aditya.ranjan@ultrahuman.com, aikanshi@ultrahuman.com, akash.garg@ultrahuman.com, amal.robin@ultrahuman.com, aman.katiyar@ultrahuman.com, ankit.bhandari@ultrahuman.com, ankush.pr@ultrahuman.com, anmol@ultrahuman.com, aryan.das@ultrahuman.com, ashad@ultrahuman.com, asma.sultana@ultrahuman.com, avishi.gupta@ultrahuman.com, ayush.jangid@ultrahuman.com, ayush.mokal@ultrahuman.com, banveen@ultrahuman.com, bhawna.choudhary@ultrahuman.com, diksha.sagar@ultrahuman.com, divya.sharma@ultrahuman.com, divyansh.mishra@ultrahuman.com, fatema@ultrahuman.com, fatima.gauhar@ultrahuman.com, gaurav.malik@ultrahuman.com, govind.kumar@ultrahuman.com, ahmad.haris@ultrahuman.com, ishita.dutta@ultrahuman.com, jaideep@ultrahuman.com, ketki.hiwarkar@ultrahuman.com, loknath.r@ultrahuman.com, mahyur.chandarey@ultrahuman.com, manasa.manjunath@ultrahuman.com, meghna@ultrahuman.com, mehar.kashyap@ultrahuman.com, munish@ultrahuman.com, nikhil.matam@ultrahuman.com, nimisa.bora@ultrahuman.com, nitasha.sharma@ultrahuman.com, numan@ultrahuman.com, parleen.saund@ultrahuman.com, parth.saluja@ultrahuman.com, payal.pamnani@ultrahuman.com, prateek.govila@ultrahuman.com, pratiksha.pagare@ultrahuman.com, riya.radhakrishnan@ultrahuman.com, saloni.jain@ultrahuman.com, sandeep.manda@ultrahuman.com, sanil.sharma@ultrahuman.com, shalm@ultrahuman.com, sunny@ultrahuman.com, sharmistha.palui@ultrahuman.com, shrushti@ultrahuman.com, simran.rajput@ultrahuman.com, sonia.singh@ultrahuman.com, sreeza@ultrahuman.com, surabhi.parapurath@ultrahuman.com, sureshma.ck@ultrahuman.com, suvira@ultrahuman.com, suyog@ultrahuman.com, swapna.mishra@ultrahuman.com, tannu.nongmaithem@ultrahuman.com, trishala@ultrahuman.com, tsering@ultrahuman.com, twinkle@ultrahuman.com, vaibhav.verma@ultrahuman.com, vinayak.ray@ultrahuman.com, vishal.misal@ultrahuman.com, vishnu.balesh@ultrahuman.com, yohaan.dhanowa@ultrahuman.com
+
+# test - Quiz Content Template
+
+## Sheet Setup Instructions:
+1. Create 3 sheets in your Google Sheets document:
+   - "Topics"
+   - "Questions" 
+   - "Dashboard"
+
+## Topics Sheet Headers (Row 1):
+Topic ID | Topic Name | Description | Difficulty | Status | Created Date | Updated Date | Notes
+
+## Topics Sheet Example (Row 2):
+example-topic | Example Topic | This is an example topic | beginner | ACTIVE | 21/07/2025 | 21/07/2025 | Sample topic
+
+## Questions Sheet Headers (Row 1):
+Question ID | Topic | Question Text | Option A | Option B | Option C | Option D | Correct | Explanation | Difficulty | Status | Created Date | Notes
+
+## Questions Sheet Example (Row 2):
+q-001 | example-topic | What is customer experience? | Service | Product | Journey | Process | A | CX is the overall service experience | beginner | ACTIVE | 21/07/2025 | Sample question
+
+## Status Options:
+- ACTIVE: Live on website
+- DRAFT: Not visible to users  
+- INACTIVE: Removed from website
+
+## Difficulty Options:
+- beginner
+- intermediate
+- advanced
+
+## Dashboard Sheet (Optional):
+Create a simple dashboard with:
+- Category: test
+- Last Updated: 21/07/2025, 20:00:27
+- Total Topics: [Count from Topics sheet]
+- Total Questions: [Count from Questions sheet]
+- Active Topics: [Count of ACTIVE topics]
+- Active Questions: [Count of ACTIVE questions]
+    

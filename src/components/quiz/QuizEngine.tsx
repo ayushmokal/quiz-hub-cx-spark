@@ -331,36 +331,36 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
   const progress = ((quizState.currentQuestionIndex) / quizState.questions.length) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 p-4 md:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 p-2 md:p-8">
       <div className="max-w-4xl mx-auto">
         {/* Modern Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="space-y-2">
-              <div className="flex items-center space-x-3">
-                <div className="px-3 py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full font-bold text-sm">
+        <div className="mb-4 md:mb-8">
+          <div className="flex flex-col space-y-3 md:flex-row md:items-center md:justify-between md:space-y-0 mb-4 md:mb-6">
+            <div className="space-y-1 md:space-y-2">
+              <div className="flex items-center space-x-2 md:space-x-3">
+                <div className="px-2 py-1 md:px-3 md:py-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full font-bold text-xs md:text-sm">
                   Q{quizState.currentQuestionIndex + 1}
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold text-slate-900 tracking-tight">
+                <h1 className="text-xl md:text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">
                   {topic.displayName}
                 </h1>
               </div>
-              <p className="text-slate-500 text-lg font-medium">
+              <p className="text-slate-500 text-sm md:text-lg font-medium">
                 Question {quizState.currentQuestionIndex + 1} of {quizState.questions.length}
               </p>
             </div>
             
             {/* Status Pills */}
-            <div className="flex items-center space-x-3">
-              <div className={`px-4 py-2 rounded-full font-semibold text-sm transition-all duration-200 ${
+            <div className="flex items-center space-x-2 md:space-x-3">
+              <div className={`px-2 md:px-4 py-1 md:py-2 rounded-full font-semibold text-xs md:text-sm transition-all duration-200 ${
                 timeLeft <= 10 
                   ? 'bg-red-100 text-red-700 ring-2 ring-red-200 animate-pulse' 
                   : 'bg-slate-100 text-slate-700'
               }`}>
-                <Clock className="inline mr-2 h-4 w-4" />
+                <Clock className="inline mr-1 md:mr-2 h-3 w-3 md:h-4 md:w-4" />
                 {timeLeft}s
               </div>
-              <div className="px-4 py-2 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 rounded-full font-semibold text-sm">
+              <div className="px-2 md:px-4 py-1 md:py-2 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 rounded-full font-semibold text-xs md:text-sm">
                 {currentQuestion.difficulty}
               </div>
             </div>
@@ -382,53 +382,53 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
 
         {/* Question Card - Ultra Modern Design */}
         <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-3xl transform rotate-1 opacity-5" />
-          <div className="relative bg-white rounded-3xl shadow-xl border border-slate-200/50 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl md:rounded-3xl transform rotate-1 opacity-5" />
+          <div className="relative bg-white rounded-2xl md:rounded-3xl shadow-xl border border-slate-200/50 overflow-hidden">
             {/* Card Header */}
-            <div className="p-8 md:p-10 border-b border-slate-100">
-              <div className="flex items-start justify-between mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">
+            <div className="p-4 md:p-8 lg:p-10 border-b border-slate-100">
+              <div className="flex items-start justify-between mb-3 md:mb-4">
+                <div className="w-8 h-8 md:w-12 md:h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl md:rounded-2xl flex items-center justify-center">
+                  <span className="text-white font-bold text-sm md:text-lg">
                     {quizState.currentQuestionIndex + 1}
                   </span>
                 </div>
                 {currentQuestion.type === 'multi-select' && (
-                  <div className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">
+                  <div className="px-2 py-1 md:px-3 md:py-1 bg-amber-100 text-amber-800 rounded-full text-xs md:text-sm font-medium">
                     Select all that apply
                   </div>
                 )}
               </div>
               
-              <h2 className="text-2xl md:text-3xl font-bold text-slate-900 leading-relaxed">
+              <h2 className="text-lg md:text-2xl lg:text-3xl font-bold text-slate-900 leading-relaxed">
                 {currentQuestion.content}
               </h2>
             </div>
 
             {/* Answer Options */}
-            <div className="p-8 md:p-10 space-y-4">
+            <div className="p-4 md:p-8 lg:p-10 space-y-3 md:space-y-4">
               {currentQuestion.options.map((option, index) => (
                 <button
                   key={index}
                   onClick={() => handleAnswerSelect(index)}
-                  className={`group w-full text-left p-6 rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.01] ${
+                  className={`group w-full text-left p-3 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all duration-300 transform hover:scale-[1.01] ${
                     selectedAnswers.includes(index)
                       ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg ring-4 ring-blue-100'
                       : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-md'
                   }`}
                 >
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center font-semibold transition-all duration-200 ${
+                  <div className="flex items-center space-x-3 md:space-x-4">
+                    <div className={`w-6 h-6 md:w-8 md:h-8 rounded-full border-2 flex items-center justify-center font-semibold transition-all duration-200 ${
                       selectedAnswers.includes(index)
                         ? 'border-blue-500 bg-blue-500 text-white'
                         : 'border-slate-300 text-slate-600 group-hover:border-slate-400'
                     }`}>
                       {selectedAnswers.includes(index) ? (
-                        <CheckCircle className="w-5 h-5" />
+                        <CheckCircle className="w-3 h-3 md:w-5 md:h-5" />
                       ) : (
-                        <span className="text-sm">{String.fromCharCode(65 + index)}</span>
+                        <span className="text-xs md:text-sm">{String.fromCharCode(65 + index)}</span>
                       )}
                     </div>
-                    <span className={`flex-1 text-lg font-medium transition-colors duration-200 ${
+                    <span className={`flex-1 text-sm md:text-lg font-medium transition-colors duration-200 ${
                       selectedAnswers.includes(index) ? 'text-slate-900' : 'text-slate-700'
                     }`}>
                       {option}
@@ -441,28 +441,28 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
         </div>
 
         {/* Navigation - Modern Floating Bar */}
-        <div className="mt-8 flex justify-between items-center">
+        <div className="mt-4 md:mt-8 flex flex-col space-y-3 md:flex-row md:justify-between md:items-center md:space-y-0">
           <button
             onClick={onExit}
-            className="px-6 py-3 text-slate-600 hover:text-slate-900 font-semibold transition-colors duration-200 hover:bg-slate-100 rounded-xl"
+            className="px-4 py-2 md:px-6 md:py-3 text-slate-600 hover:text-slate-900 font-semibold transition-colors duration-200 hover:bg-slate-100 rounded-xl order-2 md:order-1"
           >
             Exit Quiz
           </button>
           
-          <div className="flex items-center space-x-4">
-            <div className="text-sm text-slate-500 font-medium">
+          <div className="flex flex-col space-y-2 md:flex-row md:items-center md:space-y-0 md:space-x-4 order-1 md:order-2">
+            <div className="text-xs md:text-sm text-slate-500 font-medium text-center md:text-left">
               {selectedAnswers.length === 0 ? 'Select an answer to continue' : 'Ready to proceed'}
             </div>
             <button
               onClick={handleNextQuestion}
               disabled={selectedAnswers.length === 0}
-              className={`px-8 py-3 rounded-xl font-semibold text-white transition-all duration-200 transform ${
+              className={`px-6 py-3 md:px-8 md:py-3 rounded-xl font-semibold text-white transition-all duration-200 transform ${
                 selectedAnswers.length === 0
                   ? 'bg-slate-300 cursor-not-allowed'
                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 hover:scale-105 shadow-lg hover:shadow-xl'
               }`}
             >
-              <span className="flex items-center">
+              <span className="flex items-center justify-center">
                 {quizState.currentQuestionIndex >= quizState.questions.length - 1 ? 'Finish Quiz' : 'Next Question'}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </span>

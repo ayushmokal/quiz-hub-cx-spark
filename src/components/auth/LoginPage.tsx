@@ -68,10 +68,10 @@ export function LoginPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="text-center">
-          <div className="p-4 bg-red-500 rounded-2xl shadow-lg mb-4 mx-auto w-fit">
+          <div className="p-4 bg-black rounded-2xl shadow-lg mb-4 mx-auto w-fit">
             <img src="/assets/icon_ultraquiz.png" alt="CX Ultra Quiz" className="h-10 w-10" />
           </div>
-          <Loader2 className="h-8 w-8 animate-spin text-red-500 mx-auto" />
+          <Loader2 className="h-8 w-8 animate-spin text-white mx-auto" />
           <p className="text-white mt-2">Loading CX Ultra Quiz...</p>
         </div>
       </div>
@@ -85,7 +85,7 @@ export function LoginPage() {
           {/* Header */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-6">
-              <div className="p-4 bg-red-500 rounded-2xl shadow-lg">
+              <div className="p-4 rounded-2xl shadow-lg">
                 <img src="/assets/icon_ultraquiz.png" alt="CX Ultra Quiz" className="h-10 w-10" />
               </div>
             </div>
@@ -110,7 +110,7 @@ export function LoginPage() {
 
             <Button
               type="button"
-              className="w-full bg-red-500 hover:bg-red-600 text-white font-medium h-12 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+              className="w-full bg-black hover:bg-gray-800 text-white font-medium h-12 text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
               onClick={handleGoogleSignIn}
               disabled={isGoogleLoading}
             >
@@ -179,7 +179,7 @@ export function LoginPage() {
                           placeholder="your.email@ultrahuman.com"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="pl-10 border-gray-300 focus:border-red-500 focus:ring-red-500/20 rounded-xl h-12"
+                          className="pl-10 border-gray-300 focus:border-black focus:ring-black/20 rounded-xl h-12"
                           required
                         />
                       </div>
@@ -195,7 +195,7 @@ export function LoginPage() {
                           placeholder="Enter your password"
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
-                          className="pl-10 border-gray-300 focus:border-red-500 focus:ring-red-500/20 rounded-xl h-12"
+                          className="pl-10 border-gray-300 focus:border-black focus:ring-black/20 rounded-xl h-12"
                           required
                         />
                       </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Home, Play, Trophy } from 'lucide-react';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -20,73 +21,76 @@ import { AuditLogViewer } from './components/admin/AuditLogViewer';
 import { UserManagement } from './components/admin/UserManagement';
 import { QuizImport } from './components/admin/QuizImport';
 import { Settings } from './components/admin/Settings';
-import { Topic } from './types';
+import { QuizRoute } from './components/quiz/QuizRoute';
 
 const queryClient = new QueryClient();
 
-function MainApp() {
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
-  const [currentView, setCurrentView] = useState('dashboard');
-  const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
-  const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
-
+  
   if (!user) {
     return <LoginPage />;
   }
+  
+  return <>{children}</>;
+}
 
-  const handleStartQuiz = (topic: Topic) => {
-    setSelectedTopic(topic);
-    setCurrentView('quiz-active');
+function Layout({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Extract current view from pathname for navigation highlighting
+  const getCurrentView = () => {
+    const path = location.pathname;
+    if (path === '/') return 'dashboard';
+    if (path.startsWith('/quiz')) return 'quiz';
+    if (path === '/leaderboard') return 'leaderboard';
+    if (path === '/admin/users') return 'manage-users';
+    if (path === '/admin/topics') return 'manage-topics';
+    if (path === '/admin/questions') return 'manage-questions';
+    if (path === '/admin/categories') return 'manage-categories';
+    if (path === '/admin/analytics') return 'analytics';
+    if (path === '/admin/import') return 'quiz-import';
+    if (path === '/admin/settings') return 'settings';
+    return 'dashboard';
   };
 
-  const handleQuizComplete = (score: number, accuracy: number) => {
-    console.log('App: Quiz completed with score:', score, 'accuracy:', accuracy, 'for user:', user?.id);
-    // Trigger dashboard refresh to show updated stats
-    setDashboardRefreshTrigger(prev => prev + 1);
-    // Show success message and redirect to dashboard
-    setCurrentView('dashboard');
-    setSelectedTopic(null);
-  };
+  const currentView = getCurrentView();
 
-  const handleQuizExit = () => {
-    setCurrentView('quiz');
-    setSelectedTopic(null);
-  };
-
-  const renderCurrentView = () => {
-    switch (currentView) {
+  const handleViewChange = (view: string) => {
+    switch (view) {
       case 'dashboard':
-        return <Dashboard onViewChange={setCurrentView} refreshTrigger={dashboardRefreshTrigger} />;
+        navigate('/');
+        break;
       case 'quiz':
-        return <QuizSelection onStartQuiz={handleStartQuiz} />;
-      case 'quiz-active':
-        return selectedTopic ? (
-          <QuizEngine 
-            topic={selectedTopic} 
-            onComplete={handleQuizComplete}
-            onExit={handleQuizExit}
-          />
-        ) : (
-          <QuizSelection onStartQuiz={handleStartQuiz} />
-        );
+        navigate('/quiz');
+        break;
       case 'leaderboard':
-        return <Leaderboard />;
-      case 'manage-questions':
-        return <QuestionManagement />;
-              case 'manage-topics':
-          return <TopicManagement />;
-        case 'manage-categories':
-          return <CategoryManagement />;
-        case 'analytics':
-          return <AuditLogViewer />;
+        navigate('/leaderboard');
+        break;
       case 'manage-users':
-        return <UserManagement />;
+        navigate('/admin/users');
+        break;
+      case 'manage-topics':
+        navigate('/admin/topics');
+        break;
+      case 'manage-questions':
+        navigate('/admin/questions');
+        break;
+      case 'manage-categories':
+        navigate('/admin/categories');
+        break;
+      case 'analytics':
+        navigate('/admin/analytics');
+        break;
       case 'quiz-import':
-        return <QuizImport />;
+        navigate('/admin/import');
+        break;
       case 'settings':
-        return <Settings />;
+        navigate('/admin/settings');
+        break;
       default:
-        return <Dashboard onViewChange={setCurrentView} refreshTrigger={dashboardRefreshTrigger} />;
+        navigate('/');
     }
   };
 
@@ -95,10 +99,10 @@ function MainApp() {
       <Header />
       <div className="flex">
         <div className="hidden lg:block">
-          <Navigation currentView={currentView} onViewChange={setCurrentView} />
+          <Navigation currentView={currentView} onViewChange={handleViewChange} />
         </div>
         <main className="flex-1 p-4 md:p-6 lg:p-8 pb-20 lg:pb-8">
-          {renderCurrentView()}
+          {children}
         </main>
       </div>
       
@@ -106,7 +110,7 @@ function MainApp() {
       <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#46494D]/20 p-2 pb-safe">
         <div className="flex justify-around">
           <button
-            onClick={() => setCurrentView('dashboard')}
+            onClick={() => handleViewChange('dashboard')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
               currentView === 'dashboard' ? 'text-black bg-black/5' : 'text-[#46494D]'
             }`}
@@ -115,7 +119,7 @@ function MainApp() {
             <span className="text-xs font-medium">Home</span>
           </button>
           <button
-            onClick={() => setCurrentView('quiz')}
+            onClick={() => handleViewChange('quiz')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
               currentView === 'quiz' ? 'text-black bg-black/5' : 'text-[#46494D]'
             }`}
@@ -124,7 +128,7 @@ function MainApp() {
             <span className="text-xs font-medium">Quiz</span>
           </button>
           <button
-            onClick={() => setCurrentView('leaderboard')}
+            onClick={() => handleViewChange('leaderboard')}
             className={`flex flex-col items-center space-y-1 p-2 rounded-lg transition-colors ${
               currentView === 'leaderboard' ? 'text-black bg-black/5' : 'text-[#46494D]'
             }`}
@@ -135,6 +139,42 @@ function MainApp() {
         </div>
       </div>
     </div>
+  );
+}
+
+function MainApp() {
+  const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
+
+  const handleQuizComplete = () => {
+    setDashboardRefreshTrigger(prev => prev + 1);
+  };
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/*" element={
+          <ProtectedRoute>
+            <Layout>
+              <Routes>
+                <Route path="/" element={<Dashboard onViewChange={() => {}} refreshTrigger={dashboardRefreshTrigger} />} />
+                <Route path="/quiz" element={<QuizSelection />} />
+                <Route path="/quiz/:topicId" element={<QuizRoute />} />
+                <Route path="/leaderboard" element={<Leaderboard />} />
+                <Route path="/admin/users" element={<UserManagement />} />
+                <Route path="/admin/topics" element={<TopicManagement />} />
+                <Route path="/admin/questions" element={<QuestionManagement />} />
+                <Route path="/admin/categories" element={<CategoryManagement />} />
+                <Route path="/admin/analytics" element={<AuditLogViewer />} />
+                <Route path="/admin/import" element={<QuizImport />} />
+                <Route path="/admin/settings" element={<Settings />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Layout>
+          </ProtectedRoute>
+        } />
+      </Routes>
+    </Router>
   );
 }
 

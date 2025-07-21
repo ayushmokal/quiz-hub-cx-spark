@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Play, Clock, HelpCircle, Target } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -7,15 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { topicsAPI, categoriesAPI } from '../../services/api';
 import { Topic, Category } from '../../types';
 
-interface QuizSelectionProps {
-  onStartQuiz: (topic: Topic) => void;
-}
-
-export function QuizSelection({ onStartQuiz }: QuizSelectionProps) {
+export function QuizSelection() {
+  const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [topics, setTopics] = useState<Topic[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleStartQuiz = (topic: Topic) => {
+    navigate(`/quiz/${topic.id}`);
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -177,7 +179,7 @@ export function QuizSelection({ onStartQuiz }: QuizSelectionProps) {
 
                 {/* Start Button */}
                 <Button
-                  onClick={() => onStartQuiz(topic)}
+                  onClick={() => handleStartQuiz(topic)}
                   className="w-full quiz-button-primary group-hover:scale-105 transition-transform"
                 >
                   <Play className="mr-2 h-4 w-4" />

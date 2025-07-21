@@ -1,6 +1,8 @@
 import { 
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   signOut,
   onAuthStateChanged,
@@ -184,10 +186,36 @@ export const authAPI = {
       hd: 'ultrahuman.com' // Restrict to ultrahuman.com domain
     });
     
-    const result = await signInWithPopup(auth, provider);
+    // Use redirect to avoid COOP issues completely
+    try {
+      await signInWithRedirect(auth, provider);
+      throw new Error('REDIRECT_INITIATED');
+    } catch (error: any) {
+      if (error.message === 'REDIRECT_INITIATED') {
+        throw error; // Re-throw redirect signal
+      }
+      
+      // If redirect fails, try popup as fallback with relaxed COOP
+      try {
+        const result = await signInWithPopup(auth, provider);
+        
+        // Auto-create user profile if doesn't exist
+        if (result.user) {
+          await this.ensureUserProfile(result.user);
+        }
+        
+        return result;
+      } catch (popupError: any) {
+        console.error('Both redirect and popup failed:', { redirect: error, popup: popupError });
+        throw popupError;
+      }
+    }
+  },
+
+  async handleRedirectResult(): Promise<UserCredential | null> {
+    const result = await getRedirectResult(auth);
     
-    // Auto-create user profile if doesn't exist
-    if (result.user) {
+    if (result?.user) {
       await this.ensureUserProfile(result.user);
     }
     
@@ -222,7 +250,8 @@ export const authAPI = {
       role: data.role,
       avatar: data.avatar,
       department: data.department,
-      joinedAt: data.joinedAt.toDate().toISOString()
+      joinedAt: data.joinedAt.toDate().toISOString(),
+      isActive: data.isActive !== false // Default to true if not set
     };
   },
 
@@ -233,6 +262,7 @@ export const authAPI = {
     // Check if there's a manually created user record with this email
     const email = firebaseUser.email!;
     let manualUserData = null;
+    let deactivatedUserData = null;
     
     // Search for manually created user or admin-created user by email
     const usersQuery = query(
@@ -253,15 +283,44 @@ export const authAPI = {
         await deleteDoc(manualUserDoc.ref);
       }
     }
+
+    // If no manual user found, check for previously deactivated accounts with same email
+    if (!manualUserData) {
+      const deactivatedQuery = query(
+        collection(db, 'users'),
+        where('email', '==', email),
+        where('isActive', '==', false)
+      );
+      const deactivatedSnapshot = await getDocs(deactivatedQuery);
+      
+      if (!deactivatedSnapshot.empty) {
+        const deactivatedUserDoc = deactivatedSnapshot.docs[0];
+        deactivatedUserData = deactivatedUserDoc.data();
+        console.log(`🔄 Account restoration: Found deactivated account for ${email}, restoring user data...`);
+        
+        // Create audit log for account restoration
+        await createAuditLog('users', firebaseUser.uid, 'CREATE', {}, {
+          action: 'account_restoration',
+          email: email,
+          restoredFromUserId: deactivatedUserDoc.id,
+          restoredData: {
+            name: deactivatedUserData.name,
+            role: deactivatedUserData.role,
+            department: deactivatedUserData.department,
+            previousJoinDate: deactivatedUserData.joinedAt
+          }
+        });
+      }
+    }
     
     if (userDoc.exists()) {
       const data = userDoc.data();
       
-      // Determine correct role (use manual data if available, otherwise default logic)
-      let correctRole: 'agent' | 'coach' | 'admin' = manualUserData?.role || 'agent';
+      // Determine correct role (use manual data if available, otherwise deactivated data, otherwise default logic)
+      let correctRole: 'agent' | 'coach' | 'admin' = manualUserData?.role || deactivatedUserData?.role || 'agent';
       
-      if (!manualUserData) {
-        // Use default role assignment logic if no manual user found
+      if (!manualUserData && !deactivatedUserData) {
+        // Use default role assignment logic if no manual user or deactivated user found
         if (email === 'admin@ultrahuman.com' || email === 'adi@ultrahuman.com' || email === 'ayush.mokal@ultrahuman.com') {
           correctRole = 'admin';
         } else if (['jaideep@ultrahuman.com', 'munish@ultrahuman.com'].includes(email)) {
@@ -290,7 +349,17 @@ export const authAPI = {
         updates.department = manualUserData.department;
         updates.name = manualUserData.name;
         console.log(`Activated manually created user: ${manualUserData.name} (${manualUserData.role})`);
-      } else if (data.role !== correctRole) {
+      } 
+      // Otherwise merge deactivated user data if available
+      else if (deactivatedUserData) {
+        updates.role = deactivatedUserData.role;
+        updates.department = deactivatedUserData.department;
+        updates.name = deactivatedUserData.name;
+        updates.restoredAt = Timestamp.now();
+        console.log(`🔄 Restored deactivated user: ${deactivatedUserData.name} (${deactivatedUserData.role})`);
+      }
+      // Otherwise apply default role logic
+      else if (data.role !== correctRole) {
         updates.role = correctRole;
         console.log(`Updating role for ${email}: ${data.role} → ${correctRole}`);
       }
@@ -300,17 +369,18 @@ export const authAPI = {
       return {
         id: userDoc.id,
         email: data.email,
-        name: manualUserData?.name || data.name,
-        role: manualUserData?.role || correctRole,
+        name: manualUserData?.name || deactivatedUserData?.name || data.name,
+        role: manualUserData?.role || deactivatedUserData?.role || correctRole,
         avatar: data.avatar,
-        department: manualUserData?.department || data.department,
-        joinedAt: data.joinedAt.toDate().toISOString()
+        department: manualUserData?.department || deactivatedUserData?.department || data.department,
+        joinedAt: data.joinedAt.toDate().toISOString(),
+        isActive: true
       };
     }
     
-    // Create new user profile (either from manual data or fresh)
+    // Create new user profile (either from manual data, deactivated data, or fresh)
     const displayName = firebaseUser.displayName;
-    let name = manualUserData?.name || displayName;
+    let name = manualUserData?.name || deactivatedUserData?.name || displayName;
     
     if (!name) {
       // Extract name from email: "first.last@ultrahuman.com" -> "First Last"
@@ -321,10 +391,10 @@ export const authAPI = {
         .join(' ');
     }
 
-    // Determine role (use manual data if available, otherwise default logic)
-    let role: 'agent' | 'coach' | 'admin' = manualUserData?.role || 'agent';
+    // Determine role (use manual data, deactivated data, or default logic)
+    let role: 'agent' | 'coach' | 'admin' = manualUserData?.role || deactivatedUserData?.role || 'agent';
     
-    if (!manualUserData) {
+    if (!manualUserData && !deactivatedUserData) {
       if (email === 'admin@ultrahuman.com' || email === 'adi@ultrahuman.com' || email === 'ayush.mokal@ultrahuman.com') {
         role = 'admin';
       } else if (['jaideep@ultrahuman.com', 'munish@ultrahuman.com'].includes(email)) {
@@ -336,14 +406,15 @@ export const authAPI = {
       email,
       name,
       role,
-      department: manualUserData?.department || 'Customer Support',
+      department: manualUserData?.department || deactivatedUserData?.department || 'Customer Support',
       avatar: firebaseUser.photoURL,
-      joinedAt: manualUserData?.joinedAt || Timestamp.now(),
+      joinedAt: manualUserData?.joinedAt || deactivatedUserData?.joinedAt || Timestamp.now(),
       lastLoginAt: Timestamp.now(),
       isActive: true,
       authProvider: 'google',
       createdBy: manualUserData?.createdBy || null,
-      notes: manualUserData?.notes || ''
+      notes: manualUserData?.notes || deactivatedUserData?.notes || '',
+      restoredAt: deactivatedUserData ? Timestamp.now() : null
     };
 
     await setDoc(userDocRef, newUser);
@@ -351,11 +422,14 @@ export const authAPI = {
     // Create audit log
     await createAuditLog('users', firebaseUser.uid, 'CREATE', null, {
       ...newUser,
-      activatedFromManualCreation: !!manualUserData
+      activatedFromManualCreation: !!manualUserData,
+      restoredFromDeactivation: !!deactivatedUserData
     });
     
     if (manualUserData) {
       console.log(`✅ Successfully activated manually created user: ${name} (${role})`);
+    } else if (deactivatedUserData) {
+      console.log(`🔄 Successfully restored deactivated user: ${name} (${role})`);
     }
     
     return {
@@ -365,7 +439,8 @@ export const authAPI = {
       role: newUser.role,
       avatar: newUser.avatar,
       department: newUser.department,
-      joinedAt: newUser.joinedAt.toDate().toISOString()
+      joinedAt: newUser.joinedAt.toDate().toISOString(),
+      isActive: true
     };
   },
 
@@ -401,7 +476,8 @@ export const usersAPI = {
         role: data.role,
         avatar: data.avatar,
         department: data.department,
-        joinedAt: data.joinedAt.toDate().toISOString()
+        joinedAt: data.joinedAt.toDate().toISOString(),
+        isActive: data.isActive !== false // Default to true if not set
       };
     });
   },
@@ -420,6 +496,7 @@ export const usersAPI = {
     if (updates.role) updateData.role = updates.role;
     if (updates.department) updateData.department = updates.department;
     if (updates.avatar) updateData.avatar = updates.avatar;
+    if (updates.isActive !== undefined) updateData.isActive = updates.isActive;
     
     updateData.updatedAt = Timestamp.now();
     
@@ -437,8 +514,65 @@ export const usersAPI = {
       role: data.role,
       avatar: data.avatar,
       department: data.department,
-      joinedAt: data.joinedAt.toDate().toISOString()
+      joinedAt: data.joinedAt.toDate().toISOString(),
+      isActive: data.isActive !== false
     };
+  },
+
+  async deactivateUser(id: string): Promise<void> {
+    const userDocRef = doc(db, 'users', id);
+    const oldDoc = await getDoc(userDocRef);
+    const oldData = oldDoc.data();
+    
+    const updateData = {
+      isActive: false,
+      deactivatedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    };
+    
+    await updateDoc(userDocRef, updateData);
+    
+    // Create audit log
+    await createAuditLog('users', id, 'UPDATE', oldData, updateData);
+    
+    console.log(`🚫 User deactivated: ${id}`);
+  },
+
+  async reactivateUser(id: string): Promise<void> {
+    const userDocRef = doc(db, 'users', id);
+    const oldDoc = await getDoc(userDocRef);
+    const oldData = oldDoc.data();
+    
+    const updateData = {
+      isActive: true,
+      reactivatedAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    };
+    
+    await updateDoc(userDocRef, updateData);
+    
+    // Create audit log
+    await createAuditLog('users', id, 'UPDATE', oldData, updateData);
+    
+    console.log(`✅ User reactivated: ${id}`);
+  },
+
+  async deleteUser(id: string): Promise<void> {
+    const userDocRef = doc(db, 'users', id);
+    const oldDoc = await getDoc(userDocRef);
+    const oldData = oldDoc.data();
+    
+    if (!oldData) {
+      throw new Error('User not found');
+    }
+    
+    // Create audit log before deletion
+    await createAuditLog('users', id, 'DELETE', oldData, null);
+    
+    // Delete user document
+    await deleteDoc(userDocRef);
+    
+    console.log(`🗑️ User permanently deleted: ${id} (${oldData.name})`);
   }
 };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, Mail, Calendar, Award, TrendingUp, MoreHorizontal, Shield, UserX, UserPlus } from 'lucide-react';
+import { Users, Search, Mail, Calendar, Award, TrendingUp, MoreHorizontal, Shield, UserX, UserPlus, Trash2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
@@ -20,6 +20,7 @@ import {
   TableHeader, 
   TableRow 
 } from '../ui/table';
+import { useToast } from '../../hooks/use-toast';
 import { usersAPI, dashboardAPI } from '../../services/api';
 import { User, UserRole } from '../../types';
 import { CreateUser } from './CreateUser';
@@ -29,11 +30,12 @@ interface UserWithStats extends User {
   overallAccuracy: number;
   totalQuizzes: number;
   currentStreak: number;
-  lastActivity: string;
+  lastActivity: string | undefined;
   bestCategory: string;
 }
 
 export function UserManagement() {
+  const { toast } = useToast();
   const [users, setUsers] = useState<UserWithStats[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<UserWithStats[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,7 +67,7 @@ export function UserManagement() {
               overallAccuracy: stats.overallAccuracy || 0,
               totalQuizzes: stats.weeklyQuizzes || 0, // Use weeklyQuizzes as fallback
               currentStreak: stats.currentStreak || 0,
-              lastActivity: 'Recent', // Placeholder - we don't have this field
+              lastActivity: user.joinedAt, // Use joinedAt as last activity for now
               bestCategory: stats.topCategory || 'No quizzes yet' // Use topCategory
             };
           } catch (error) {
@@ -76,7 +78,7 @@ export function UserManagement() {
               overallAccuracy: 0,
               totalQuizzes: 0,
               currentStreak: 0,
-              lastActivity: 'Never',
+              lastActivity: user.joinedAt,
               bestCategory: 'No quizzes yet'
             };
           }
@@ -128,6 +130,87 @@ export function UserManagement() {
     }
   };
 
+  const handleDeactivateUser = async (userId: string) => {
+    try {
+      await usersAPI.deactivateUser(userId);
+      await loadUsers(); // Reload to get updated data
+      toast({
+        title: "User Deactivated",
+        description: "The user has been successfully deactivated.",
+      });
+    } catch (error) {
+      console.error('Error deactivating user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to deactivate user. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleReactivateUser = async (userId: string) => {
+    try {
+      await usersAPI.reactivateUser(userId);
+      await loadUsers(); // Reload to get updated data
+      toast({
+        title: "User Reactivated",
+        description: "The user has been successfully reactivated.",
+      });
+    } catch (error) {
+      console.error('Error reactivating user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to reactivate user. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `⚠️ PERMANENT DELETE WARNING\n\nThis will permanently delete "${userName}" and ALL their data including:\n• Quiz attempts and scores\n• User profile and settings\n• All historical data\n\nThis action CANNOT be undone!\n\nAre you absolutely sure you want to proceed?`
+    );
+    
+    if (!confirmed) return;
+    
+    // Second confirmation for extra safety
+    const doubleConfirmed = window.confirm(
+      `FINAL CONFIRMATION\n\nYou are about to PERMANENTLY DELETE "${userName}".\n\nType YES in the prompt that follows to confirm.`
+    );
+    
+    if (!doubleConfirmed) return;
+    
+    const userConfirmation = window.prompt(
+      `To confirm permanent deletion of "${userName}", type exactly: DELETE ${userName.toUpperCase()}`
+    );
+    
+    if (userConfirmation !== `DELETE ${userName.toUpperCase()}`) {
+      toast({
+        title: "Deletion Cancelled",
+        description: "User deletion cancelled - confirmation text did not match.",
+      });
+      return;
+    }
+
+    try {
+      await usersAPI.deleteUser(userId);
+      await loadUsers(); // Reload to get updated data
+      toast({
+        title: "User Permanently Deleted",
+        description: `"${userName}" has been permanently deleted from the system.`,
+        variant: "destructive",
+      });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete user. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'admin':
@@ -141,18 +224,30 @@ export function UserManagement() {
     }
   };
 
+  const getStatusBadge = (isActive: boolean = true) => {
+    return (
+      <Badge className={`${isActive 
+        ? 'bg-green-100 text-green-800 border-green-200' 
+        : 'bg-red-100 text-red-800 border-red-200'} border`}>
+        {isActive ? 'Active' : 'Inactive'}
+      </Badge>
+    );
+  };
+
   const getAccuracyColor = (accuracy: number) => {
     if (accuracy >= 80) return 'text-green-600';
     if (accuracy >= 60) return 'text-yellow-600';
     return 'text-red-600';
   };
 
-  const formatDate = (dateString: string) => {
-    if (dateString === 'Never') return 'Never';
+  const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString || dateString === 'Never') return 'Never';
     try {
-      return new Date(dateString).toLocaleDateString();
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Never';
+      return date.toLocaleDateString();
     } catch {
-      return 'Unknown';
+      return 'Never';
     }
   };
 
@@ -312,6 +407,7 @@ export function UserManagement() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead>Points</TableHead>
                 <TableHead>Accuracy</TableHead>
                 <TableHead>Quizzes</TableHead>
@@ -340,6 +436,8 @@ export function UserManagement() {
                   </TableCell>
                   
                   <TableCell>{getRoleBadge(user.role)}</TableCell>
+                  
+                  <TableCell>{getStatusBadge(user.isActive)}</TableCell>
                   
                   <TableCell>
                     <div className="font-medium">{user.totalPoints.toLocaleString()}</div>
@@ -406,9 +504,30 @@ export function UserManagement() {
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600">
-                          <UserX className="mr-2 h-4 w-4" />
-                          Deactivate User
+                        {user.isActive !== false ? (
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDeactivateUser(user.id)}
+                          >
+                            <UserX className="mr-2 h-4 w-4" />
+                            Deactivate User
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem 
+                            className="text-green-600"
+                            onClick={() => handleReactivateUser(user.id)}
+                          >
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Reactivate User
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          className="text-red-700 font-semibold"
+                          onClick={() => handleDeleteUser(user.id, user.name)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Permanently Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

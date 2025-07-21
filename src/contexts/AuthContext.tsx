@@ -17,6 +17,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    const initAuth = async () => {
+      // Handle redirect result if any
+      try {
+        await authAPI.handleRedirectResult();
+      } catch (error) {
+        console.error('Redirect result error:', error);
+      }
+    };
+    
+    initAuth();
+    
     // Listen for auth changes using Firebase
     const unsubscribe = authAPI.onAuthStateChanged((user) => {
       setUser(user);
@@ -48,8 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await authAPI.signInWithGoogle();
       // The auth state change listener will handle setting the user
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Google login error:', error);
+      
+      // If redirect was initiated, don't treat it as an error
+      if (error.message === 'REDIRECT_INITIATED') {
+        // Don't set loading to false, let the redirect happen
+        return true;
+      }
+      
       setIsLoading(false);
       return false;
     }

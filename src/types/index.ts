@@ -11,6 +11,7 @@ export interface User {
   avatar?: string;
   department?: string;
   joinedAt: string;
+  isActive?: boolean;
 }
 
 export interface Category {

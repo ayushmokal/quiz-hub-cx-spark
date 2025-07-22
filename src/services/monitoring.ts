@@ -1,18 +1,7 @@
-import { getPerformance, trace } from 'firebase/performance';
 import * as Sentry from '@sentry/react';
 import app from '../lib/firebase';
 
-// Initialize Firebase Performance
-let performance: any = null;
-try {
-  performance = getPerformance(app);
-  console.log('Firebase Performance initialized successfully');
-} catch (error) {
-  console.warn('Firebase Performance initialization failed:', error);
-  // Performance monitoring will be disabled but app will continue to work
-}
-
-// Initialize Sentry
+// Initialize Sentry (Firebase Performance removed due to initialization conflicts)
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN || "https://2a6d650b5d7f45f1fe5f36299ad5dc18@o4509709733593088.ingest.us.sentry.io/4509709734707200",
   sendDefaultPii: true,
@@ -37,89 +26,62 @@ Sentry.init({
   },
 });
 
-// Performance monitoring utilities
+// Performance monitoring using Sentry spans (Firebase Performance removed)
 export class PerformanceMonitor {
-  private static traces: Map<string, any> = new Map();
+  private static activeSpans: Map<string, any> = new Map();
 
   static startTrace(traceName: string): void {
-    if (!performance) {
-      console.warn('Firebase Performance not available, skipping trace:', traceName);
-      return;
-    }
-    
-    try {
-      const traceInstance = trace(performance, traceName);
-      traceInstance.start();
-      this.traces.set(traceName, traceInstance);
-    } catch (error) {
-      console.warn('Failed to start trace:', traceName, error);
-    }
+    console.log(`[PERFORMANCE] Starting trace: ${traceName}`);
+    // Store start time for manual tracking
+    this.activeSpans.set(traceName, { startTime: Date.now() });
   }
 
   static stopTrace(traceName: string): void {
-    if (!performance) {
-      return;
-    }
-    
-    try {
-      const traceInstance = this.traces.get(traceName);
-      if (traceInstance) {
-        traceInstance.stop();
-        this.traces.delete(traceName);
-      }
-    } catch (error) {
-      console.warn('Failed to stop trace:', traceName, error);
+    const spanData = this.activeSpans.get(traceName);
+    if (spanData) {
+      const duration = Date.now() - spanData.startTime;
+      console.log(`[PERFORMANCE] Completed trace: ${traceName} (${duration}ms)`);
+      this.activeSpans.delete(traceName);
     }
   }
 
   static addTraceAttribute(traceName: string, attribute: string, value: string): void {
-    if (!performance) {
-      return;
-    }
-    
-    try {
-      const traceInstance = this.traces.get(traceName);
-      if (traceInstance) {
-        traceInstance.putAttribute(attribute, value);
-      }
-    } catch (error) {
-      console.warn('Failed to add trace attribute:', traceName, error);
+    const spanData = this.activeSpans.get(traceName);
+    if (spanData) {
+      spanData[attribute] = value;
+      console.log(`[PERFORMANCE] Added attribute to ${traceName}: ${attribute} = ${value}`);
     }
   }
 
   static addTraceMetric(traceName: string, metricName: string, value: number): void {
-    if (!performance) {
-      return;
-    }
-    
-    try {
-      const traceInstance = this.traces.get(traceName);
-      if (traceInstance) {
-        traceInstance.putMetric(metricName, value);
-      }
-    } catch (error) {
-      console.warn('Failed to add trace metric:', traceName, error);
+    const spanData = this.activeSpans.get(traceName);
+    if (spanData) {
+      spanData[metricName] = value;
+      console.log(`[PERFORMANCE] Added metric to ${traceName}: ${metricName} = ${value}`);
     }
   }
 
-  // Quiz-specific performance tracking
+  // Quiz-specific performance tracking using Sentry spans
   static trackQuizPerformance(quizId: string, action: string): void {
-    if (!performance) {
-      console.log('Performance tracking unavailable for quiz:', quizId, action);
-      return;
-    }
-    
     const traceName = `quiz_${action}_${quizId}`;
-    this.startTrace(traceName);
-    this.addTraceAttribute(traceName, 'quiz_id', quizId);
-    this.addTraceAttribute(traceName, 'action', action);
+    
+    Sentry.startSpan(
+      {
+        op: "quiz.performance",
+        name: traceName,
+        attributes: {
+          quiz_id: quizId,
+          action: action,
+        },
+      },
+      () => {
+        console.log(`[PERFORMANCE] Quiz performance tracking started: ${traceName}`);
+        this.startTrace(traceName);
+      }
+    );
   }
 
   static finishQuizPerformance(quizId: string, action: string, metrics?: { [key: string]: number }): void {
-    if (!performance) {
-      return;
-    }
-    
     const traceName = `quiz_${action}_${quizId}`;
     
     if (metrics) {
@@ -129,42 +91,53 @@ export class PerformanceMonitor {
     }
     
     this.stopTrace(traceName);
+    console.log(`[PERFORMANCE] Quiz performance tracking completed: ${traceName}`, metrics);
   }
 
-  // Page load performance
+  // Page load performance using Sentry
   static trackPageLoad(pageName: string): void {
-    if (!performance) {
-      return;
-    }
+    const traceName = `page_load_${pageName}`;
     
-    this.startTrace(`page_load_${pageName}`);
-    this.addTraceAttribute(`page_load_${pageName}`, 'page', pageName);
+    Sentry.startSpan(
+      {
+        op: "navigation.load",
+        name: traceName,
+        attributes: {
+          page: pageName,
+        },
+      },
+      () => {
+        this.startTrace(traceName);
+      }
+    );
   }
 
   static finishPageLoad(pageName: string): void {
-    if (!performance) {
-      return;
-    }
-    
-    this.stopTrace(`page_load_${pageName}`);
+    const traceName = `page_load_${pageName}`;
+    this.stopTrace(traceName);
   }
 
   // Component render performance
   static trackComponentRender(componentName: string): void {
-    if (!performance) {
-      return;
-    }
+    const traceName = `render_${componentName}`;
     
-    this.startTrace(`render_${componentName}`);
-    this.addTraceAttribute(`render_${componentName}`, 'component', componentName);
+    Sentry.startSpan(
+      {
+        op: "ui.render",
+        name: traceName,
+        attributes: {
+          component: componentName,
+        },
+      },
+      () => {
+        this.startTrace(traceName);
+      }
+    );
   }
 
   static finishComponentRender(componentName: string): void {
-    if (!performance) {
-      return;
-    }
-    
-    this.stopTrace(`render_${componentName}`);
+    const traceName = `render_${componentName}`;
+    this.stopTrace(traceName);
   }
 }
 

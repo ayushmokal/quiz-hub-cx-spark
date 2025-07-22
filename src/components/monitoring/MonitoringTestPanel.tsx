@@ -50,11 +50,11 @@ export function MonitoringTestPanel() {
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          🔍 Monitoring Test Panel
+          🔍 Sentry Monitoring Test Panel
           <Badge variant="outline">Development Only</Badge>
         </CardTitle>
         <CardDescription>
-          Test Firebase Performance Monitoring and Sentry integration. These buttons will generate test events.
+          Test Sentry error tracking and performance monitoring. Firebase Performance has been removed to avoid initialization conflicts.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -96,7 +96,7 @@ export function MonitoringTestPanel() {
           <h4 className="font-semibold text-sm mb-2">What these tests do:</h4>
           <ul className="text-sm space-y-1 text-gray-600">
             <li>• <strong>Error Tracking:</strong> Sends a test error to Sentry</li>
-            <li>• <strong>Performance:</strong> Creates a custom trace in Firebase Performance</li>
+            <li>• <strong>Performance:</strong> Creates a custom trace with Sentry spans</li>
             <li>• <strong>API Tracking:</strong> Simulates an API call with Sentry span tracking</li>
             <li>• <strong>Breadcrumbs:</strong> Adds navigation breadcrumbs for debugging context</li>
           </ul>
@@ -105,6 +105,7 @@ export function MonitoringTestPanel() {
         <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
           <p className="text-sm text-blue-800">
             <strong>Note:</strong> This panel is only visible in development mode. 
+            Firebase Performance has been removed - using Sentry for all monitoring.
             Check your browser console and Sentry dashboard to see the results.
           </p>
         </div>

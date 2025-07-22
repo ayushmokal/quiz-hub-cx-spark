@@ -142,6 +142,49 @@ function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function DashboardWithNavigation({ refreshTrigger }: { refreshTrigger: number }) {
+  const navigate = useNavigate();
+
+  const handleViewChange = (view: string) => {
+    switch (view) {
+      case 'dashboard':
+        navigate('/');
+        break;
+      case 'quiz':
+        navigate('/quiz');
+        break;
+      case 'leaderboard':
+        navigate('/leaderboard');
+        break;
+      case 'manage-users':
+        navigate('/admin/users');
+        break;
+      case 'manage-topics':
+        navigate('/admin/topics');
+        break;
+      case 'manage-questions':
+        navigate('/admin/questions');
+        break;
+      case 'manage-categories':
+        navigate('/admin/categories');
+        break;
+      case 'analytics':
+        navigate('/admin/analytics');
+        break;
+      case 'quiz-import':
+        navigate('/admin/import');
+        break;
+      case 'settings':
+        navigate('/admin/settings');
+        break;
+      default:
+        navigate('/');
+    }
+  };
+
+  return <Dashboard onViewChange={handleViewChange} refreshTrigger={refreshTrigger} />;
+}
+
 function MainApp() {
   const [dashboardRefreshTrigger, setDashboardRefreshTrigger] = useState(0);
 
@@ -157,7 +200,11 @@ function MainApp() {
           <ProtectedRoute>
             <Layout>
               <Routes>
-                <Route path="/" element={<Dashboard onViewChange={() => {}} refreshTrigger={dashboardRefreshTrigger} />} />
+                <Route path="/" element={
+                  <DashboardWithNavigation 
+                    refreshTrigger={dashboardRefreshTrigger} 
+                  />
+                } />
                 <Route path="/quiz" element={<QuizSelection />} />
                 <Route path="/quiz/:topicId" element={<QuizRoute />} />
                 <Route path="/leaderboard" element={<Leaderboard />} />

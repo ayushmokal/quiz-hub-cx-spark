@@ -8,8 +8,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { dashboardAPI, topicsAPI, quizAPI } from '../../services/api';
 import { Topic, DashboardStats, QuizAttempt } from '../../types';
-import { analytics } from '../../services/analytics';
-import { MonitoringTestPanel } from '../monitoring/MonitoringTestPanel';
 
 interface DashboardProps {
   onViewChange: (view: string) => void;
@@ -86,14 +84,6 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
-
-  // Track dashboard view
-  useEffect(() => {
-    if (user) {
-      analytics.trackDashboardView();
-      analytics.trackPageView('dashboard', { user_role: user.role });
-    }
-  }, [user]);
 
   // Listen for global state changes
   useEffect(() => {
@@ -314,10 +304,7 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 space-y-2 md:space-y-3">
             <Button 
-              onClick={() => {
-                analytics.trackFeatureUsed('quick_quiz_button');
-                onViewChange('quiz');
-              }}
+              onClick={() => onViewChange('quiz')}
               className="w-full quiz-button-primary h-auto py-2 md:py-3"
             >
               <Play className="mr-2 h-3 w-3 md:h-4 md:w-4" />
@@ -326,10 +313,7 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
               </div>
             </Button>
             <Button 
-              onClick={() => {
-                analytics.trackFeatureUsed('leaderboard_button');
-                onViewChange('leaderboard');
-              }}
+              onClick={() => onViewChange('leaderboard')}
               variant="outline" 
               className="w-full h-auto py-2 md:py-3"
             >
@@ -375,13 +359,6 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
           </CardContent>
         </Card>
       </div>
-      
-      {/* Monitoring Test Panel - Development Only */}
-      {import.meta.env.MODE === 'development' && (
-        <div className="mt-8">
-          <MonitoringTestPanel />
-        </div>
-      )}
     </div>
   );
 }

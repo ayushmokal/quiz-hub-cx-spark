@@ -11,13 +11,13 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase as the default app (required for Performance Monitoring)
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize Firebase Auth with the named app
+// Initialize Firebase Auth
 export const auth = getAuth(app);
 
-// Initialize Firestore with the named app
+// Initialize Firestore
 export const db = getFirestore(app);
 
 // Enable emulators in development

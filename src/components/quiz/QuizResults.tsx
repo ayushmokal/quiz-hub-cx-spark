@@ -65,7 +65,8 @@ export function QuizResults({
   const displayedResults = showOnlyIncorrect ? incorrectAnswers : questionResults;
 
   const getOptionText = (question: Question, optionIndex: number): string => {
-    return question.options[optionIndex] || '';
+    const options = [question.optionA, question.optionB, question.optionC, question.optionD];
+    return options[optionIndex] || '';
   };
 
   const getScoreColor = (accuracy: number) => {

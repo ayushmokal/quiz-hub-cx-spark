@@ -7,7 +7,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { leaderboardAPI } from '../../services/api';
 import { LeaderboardEntry } from '../../types';
-import { analytics } from '../../services/analytics';
 
 export function Leaderboard() {
   const [period, setPeriod] = useState<'current' | 'last'>('current');
@@ -19,12 +18,6 @@ export function Leaderboard() {
       try {
         const data = await leaderboardAPI.getLeaderboard();
         setLeaderboard(data);
-        
-        // Track leaderboard view with actual data
-        analytics.trackLeaderboardView({
-          view_type: period === 'current' ? 'weekly' : 'all_time',
-          total_users: data.length
-        });
       } catch (error) {
         console.error('Error loading leaderboard:', error);
       } finally {
@@ -33,13 +26,6 @@ export function Leaderboard() {
     };
 
     loadLeaderboard();
-    
-    // Track leaderboard view
-    analytics.trackLeaderboardView({
-      view_type: 'weekly',
-      total_users: 0 // Will be updated when data loads
-    });
-    analytics.trackPageView('leaderboard');
   }, []);
   
   const getRankIcon = (rank: number) => {

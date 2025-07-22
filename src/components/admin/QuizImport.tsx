@@ -44,12 +44,16 @@ export function QuizImport() {
   const [defaultTopic, setDefaultTopic] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
+  const [selectedTemplateCategory, setSelectedTemplateCategory] = useState<string>('all');
+  const [selectedTemplateTopic, setSelectedTemplateTopic] = useState<string>('all');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Reset state on component mount to clear any stale values
   useEffect(() => {
     setDefaultCategory('');
     setDefaultTopic('');
+    setSelectedTemplateCategory('all');
+    setSelectedTemplateTopic('all');
   }, []);
   const { toast } = useToast();
 
@@ -335,16 +339,113 @@ export function QuizImport() {
     }
   };
 
-  const downloadTemplate = () => {
-    const template = `question,option_a,option_b,option_c,option_d,correct_answer,explanation,topic,category,difficulty
-"What is Customer Experience?","The overall experience a customer has with a company","A marketing strategy","A sales technique","A product feature","The overall experience a customer has with a company","Customer Experience encompasses all interactions between a customer and a company throughout the customer journey.","Customer Experience Basics","CX Fundamentals","Easy"
-"What does NPS stand for?","Net Promoter Score","New Product Sales","Network Performance Score","National Payment System","Net Promoter Score","NPS measures customer loyalty and satisfaction based on likelihood to recommend.","Metrics and KPIs","CX Fundamentals","Medium"`;
+  const downloadTemplate = (categoryName?: string, topicName?: string) => {
+    // Create examples based on available categories and topics
+    const createTemplateRow = (category: Category, topic?: Topic) => {
+      const exampleTopic = topic?.displayName || 'Example Topic Name';
+      const categoryName = category.name;
+      
+      // Create category-specific example questions
+      const examples = {
+        'ultrahuman-training': {
+          question: 'What is the primary function of HRV in health monitoring?',
+          option_a: 'Heart Rate Variability measurement',
+          option_b: 'Heart Rate Volume tracking',
+          option_c: 'High Recovery Value calculation',
+          option_d: 'Heart Rhythm Velocity analysis',
+          correct_answer: 'Heart Rate Variability measurement',
+          explanation: 'HRV measures the variation in time between consecutive heartbeats, indicating autonomic nervous system function.'
+        },
+        'health-science': {
+          question: 'What does BMI stand for in health assessments?',
+          option_a: 'Body Mass Index',
+          option_b: 'Basic Metabolic Indicator',
+          option_c: 'Biological Mass Indicator',
+          option_d: 'Body Measurement Index',
+          correct_answer: 'Body Mass Index',
+          explanation: 'BMI is a measure that uses height and weight to determine if weight is healthy.'
+        },
+        'default': {
+          question: 'What is the key principle of good customer service?',
+          option_a: 'Understanding customer needs',
+          option_b: 'Selling more products',
+          option_c: 'Reducing response time',
+          option_d: 'Following scripts exactly',
+          correct_answer: 'Understanding customer needs',
+          explanation: 'Good customer service starts with understanding and addressing customer needs effectively.'
+        }
+      };
+      
+      const example = examples[categoryName as keyof typeof examples] || examples.default;
+      
+      return `"${example.question}","${example.option_a}","${example.option_b}","${example.option_c}","${example.option_d}","${example.correct_answer}","${example.explanation}","${exampleTopic}","${categoryName}","intermediate"`;
+    };
 
-    const blob = new Blob([template], { type: 'text/csv' });
+    let templateContent = '';
+    let filename = 'quiz-import-template.csv';
+
+    if (categoryName && topicName) {
+      // Specific category and topic template
+      const category = categories.find(c => c.name === categoryName);
+      const topic = topics.find(t => t.displayName === topicName);
+      
+      if (category && topic) {
+        templateContent = `question,option_a,option_b,option_c,option_d,correct_answer,explanation,topic,category,difficulty
+${createTemplateRow(category, topic)}`;
+        filename = `quiz-template-${topic.slug}.csv`;
+      }
+    } else if (categoryName) {
+      // Specific category template with all its topics
+      const category = categories.find(c => c.name === categoryName);
+      const categoryTopics = topics.filter(t => t.categoryName === categoryName);
+      
+      if (category) {
+        templateContent = `question,option_a,option_b,option_c,option_d,correct_answer,explanation,topic,category,difficulty\n`;
+        
+        if (categoryTopics.length > 0) {
+          templateContent += categoryTopics.map(topic => createTemplateRow(category, topic)).join('\n');
+        } else {
+          templateContent += createTemplateRow(category);
+        }
+        
+        filename = `quiz-template-${category.name}.csv`;
+      }
+    } else {
+      // General template with all categories and topics
+      templateContent = `question,option_a,option_b,option_c,option_d,correct_answer,explanation,topic,category,difficulty\n`;
+      
+      // Add example for each category
+      categories.forEach((category, index) => {
+        const categoryTopics = topics.filter(t => t.categoryName === category.name);
+        if (categoryTopics.length > 0) {
+          templateContent += createTemplateRow(category, categoryTopics[0]);
+        } else {
+          templateContent += createTemplateRow(category);
+        }
+        if (index < categories.length - 1) templateContent += '\n';
+      });
+      
+      filename = 'quiz-import-template-all-categories.csv';
+    }
+
+    // Add helpful comments at the top
+    const helpText = `# Quiz Import Template
+# Available Categories: ${categories.map(c => c.name || 'unknown').join(', ')}
+# Available Topics: ${topics.map(t => `"${t.displayName || 'unknown'}" (${t.categoryName || 'unknown'})`).join(', ')}
+# 
+# Instructions:
+# 1. Use the exact category names from the list above
+# 2. Topic names must match existing topics or new ones will be created
+# 3. Difficulty levels: beginner, intermediate, advanced
+# 4. Correct answer must match one of the options exactly
+# 
+${templateContent}`;
+
+    const blob = new Blob([helpText], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'quiz-import-template.csv';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -367,16 +468,87 @@ export function QuizImport() {
             <RefreshCw className="h-4 w-4" />
             Refresh Topics
           </Button>
-          <Button
-            variant="outline"
-            onClick={downloadTemplate}
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download Template
-          </Button>
         </div>
       </div>
+
+      {/* Template Download Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="h-5 w-5" />
+            Download Templates
+          </CardTitle>
+          <CardDescription>
+            Download CSV templates with examples for your categories and topics
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="templateCategory">Category (Optional)</Label>
+              <Select value={selectedTemplateCategory} onValueChange={setSelectedTemplateCategory}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Categories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  {categories.map((category) => (
+                    <SelectItem key={category.id} value={category.name}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="templateTopic">Topic (Optional)</Label>
+              <Select 
+                value={selectedTemplateTopic} 
+                onValueChange={setSelectedTemplateTopic}
+                disabled={!selectedTemplateCategory || selectedTemplateCategory === "all"}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Topics" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Topics</SelectItem>
+                  {topics
+                    .filter(topic => !selectedTemplateCategory || selectedTemplateCategory === "all" || topic.categoryName === selectedTemplateCategory)
+                    .map((topic) => (
+                      <SelectItem key={topic.id} value={topic.displayName}>
+                        {topic.displayName}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>&nbsp;</Label>
+              <Button
+                onClick={() => downloadTemplate(
+                  selectedTemplateCategory === "all" ? undefined : selectedTemplateCategory, 
+                  selectedTemplateTopic === "all" ? undefined : selectedTemplateTopic
+                )}
+                className="w-full flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download Template
+              </Button>
+            </div>
+          </div>
+          
+          <div className="text-sm text-muted-foreground">
+            <p><strong>Template Options:</strong></p>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              <li><strong>All Categories:</strong> Downloads a template with examples from all categories</li>
+              <li><strong>Specific Category:</strong> Downloads a template with examples for that category's topics</li>
+              <li><strong>Specific Topic:</strong> Downloads a focused template for just that topic</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Upload Section */}
       <Card>
@@ -420,6 +592,16 @@ export function QuizImport() {
             <AlertDescription>
               <strong>Important:</strong> Make sure all categories and topics mentioned in your CSV file already exist in the system. 
               The import will fail if any category or topic is missing.
+              <br />
+              <br />
+              <strong>Category Format:</strong> Use the internal category name (e.g., "ultrahuman-training") not the display name (e.g., "Ultrahuman Training"). 
+              <br />
+              Available categories: {categories.map(c => `"${c.name || 'unknown'}"`).join(', ') || 'Loading...'}
+              <br />
+              <br />
+              <strong>Topic Format:</strong> Use the exact topic display name as shown in the system.
+              <br />
+              Available topics: {topics.map(t => `"${t.displayName || 'unknown'}" (${t.categoryName || 'unknown'})`).join(', ') || 'Loading...'}
             </AlertDescription>
           </Alert>
 

@@ -23,6 +23,7 @@ import { QuizImport } from './components/admin/QuizImport';
 import { Settings } from './components/admin/Settings';
 import { QuizRoute } from './components/quiz/QuizRoute';
 import { analytics } from './services/analytics';
+import { SentryErrorBoundary, PerformanceMonitor } from './services/monitoring';
 
 const queryClient = new QueryClient();
 
@@ -234,18 +235,38 @@ function MainApp() {
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <GlobalStateProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <MainApp />
-        </TooltipProvider>
-      </GlobalStateProvider>
-    </AuthProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  // Track app initialization performance
+  PerformanceMonitor.trackPageLoad('app_init');
+  
+  return (
+    <SentryErrorBoundary fallback={({ error, resetError }) => (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center p-8">
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Something went wrong</h1>
+          <p className="text-gray-600 mb-4">We've been notified of this error and are working to fix it.</p>
+          <button 
+            onClick={resetError}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    )}>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <GlobalStateProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <MainApp />
+            </TooltipProvider>
+          </GlobalStateProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </SentryErrorBoundary>
+  );
+};
 
 export default App;

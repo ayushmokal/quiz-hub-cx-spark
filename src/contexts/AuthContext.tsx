@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User } from '../types';
 import { authAPI } from '../services/firebase-api';
 import { analytics } from '../services/analytics';
+import { ErrorTracker, PerformanceMonitor } from '../services/monitoring';
 
 interface AuthContextType {
   user: User | null;
@@ -56,24 +57,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(true);
     
     try {
+      PerformanceMonitor.startTrace('auth_login_email');
       const user = await authAPI.signIn(email, password);
       setUser(user);
       
       // Track login event
       analytics.trackLogin('email', user.role);
+      ErrorTracker.setUser({
+        id: user.id,
+        email: user.email,
+        username: user.name
+      });
       
+      PerformanceMonitor.stopTrace('auth_login_email');
       setIsLoading(false);
       return true;
     } catch (error) {
       console.error('Login error:', error);
       
       // Track login error
+      const errorInstance = error instanceof Error ? error : new Error('Login failed');
+      ErrorTracker.trackAuthError(errorInstance, 'email_login');
+      
       analytics.trackError({
         error_type: 'authentication',
-        error_message: error instanceof Error ? error.message : 'Login failed',
+        error_message: errorInstance.message,
         user_action: 'email_login'
       });
       
+      PerformanceMonitor.stopTrace('auth_login_email');
       setIsLoading(false);
       return false;
     }

@@ -10,6 +10,7 @@ import { Topic, Question } from '../../types';
 import { questionsAPI, quizAPI } from '../../services/api';
 import { QuizResults } from './QuizResults';
 import { analytics } from '../../services/analytics';
+import { PerformanceMonitor, ErrorTracker } from '../../services/monitoring';
 
 interface QuizEngineProps {
   topic: Topic;
@@ -97,6 +98,7 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
         setIsLoading(false);
         
         // Track quiz started
+        PerformanceMonitor.trackQuizPerformance(topic.id, 'start');
         analytics.trackQuizStarted({
           topic_id: topic.id,
           topic_name: topic.displayName,
@@ -105,6 +107,11 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
         });
       } catch (error) {
         console.error('Error loading questions:', error);
+        
+        // Track quiz loading error
+        const errorInstance = error instanceof Error ? error : new Error('Failed to load quiz');
+        ErrorTracker.trackQuizError(errorInstance, topic.id);
+        
         toast({
           title: "Error Loading Quiz",
           description: "Failed to load questions. Please try again.",
@@ -239,6 +246,14 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
     }));
 
     // Track quiz completion
+    const totalTime = times.reduce((sum, time) => sum + time, 0);
+    PerformanceMonitor.finishQuizPerformance(topic.id, 'completion', {
+      score: totalScore,
+      time_taken: totalTime,
+      questions_answered: questions.length,
+      accuracy_rate: accuracy
+    });
+    
     analytics.trackQuizCompleted({
       topic_id: topic.id,
       topic_name: topic.displayName,
@@ -247,7 +262,7 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
       question_count: questions.length,
       score: totalScore,
       accuracy: accuracy,
-      time_taken: times.reduce((sum, time) => sum + time, 0),
+      time_taken: totalTime,
       questions_correct: correctAnswers,
       questions_incorrect: questions.length - correctAnswers
     });

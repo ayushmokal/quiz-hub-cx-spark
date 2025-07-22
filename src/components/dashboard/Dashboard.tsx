@@ -9,6 +9,7 @@ import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { dashboardAPI, topicsAPI, quizAPI } from '../../services/api';
 import { Topic, DashboardStats, QuizAttempt } from '../../types';
 import { analytics } from '../../services/analytics';
+import { MonitoringTestPanel } from '../monitoring/MonitoringTestPanel';
 
 interface DashboardProps {
   onViewChange: (view: string) => void;
@@ -374,6 +375,13 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
           </CardContent>
         </Card>
       </div>
+      
+      {/* Monitoring Test Panel - Development Only */}
+      {import.meta.env.MODE === 'development' && (
+        <div className="mt-8">
+          <MonitoringTestPanel />
+        </div>
+      )}
     </div>
   );
 }

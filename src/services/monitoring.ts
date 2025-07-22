@@ -3,7 +3,14 @@ import * as Sentry from '@sentry/react';
 import app from '../lib/firebase';
 
 // Initialize Firebase Performance
-const performance = getPerformance(app);
+let performance: any = null;
+try {
+  performance = getPerformance(app);
+  console.log('Firebase Performance initialized successfully');
+} catch (error) {
+  console.warn('Firebase Performance initialization failed:', error);
+  // Performance monitoring will be disabled but app will continue to work
+}
 
 // Initialize Sentry
 Sentry.init({
@@ -35,35 +42,73 @@ export class PerformanceMonitor {
   private static traces: Map<string, any> = new Map();
 
   static startTrace(traceName: string): void {
-    const traceInstance = trace(performance, traceName);
-    traceInstance.start();
-    this.traces.set(traceName, traceInstance);
+    if (!performance) {
+      console.warn('Firebase Performance not available, skipping trace:', traceName);
+      return;
+    }
+    
+    try {
+      const traceInstance = trace(performance, traceName);
+      traceInstance.start();
+      this.traces.set(traceName, traceInstance);
+    } catch (error) {
+      console.warn('Failed to start trace:', traceName, error);
+    }
   }
 
   static stopTrace(traceName: string): void {
-    const traceInstance = this.traces.get(traceName);
-    if (traceInstance) {
-      traceInstance.stop();
-      this.traces.delete(traceName);
+    if (!performance) {
+      return;
+    }
+    
+    try {
+      const traceInstance = this.traces.get(traceName);
+      if (traceInstance) {
+        traceInstance.stop();
+        this.traces.delete(traceName);
+      }
+    } catch (error) {
+      console.warn('Failed to stop trace:', traceName, error);
     }
   }
 
   static addTraceAttribute(traceName: string, attribute: string, value: string): void {
-    const traceInstance = this.traces.get(traceName);
-    if (traceInstance) {
-      traceInstance.putAttribute(attribute, value);
+    if (!performance) {
+      return;
+    }
+    
+    try {
+      const traceInstance = this.traces.get(traceName);
+      if (traceInstance) {
+        traceInstance.putAttribute(attribute, value);
+      }
+    } catch (error) {
+      console.warn('Failed to add trace attribute:', traceName, error);
     }
   }
 
   static addTraceMetric(traceName: string, metricName: string, value: number): void {
-    const traceInstance = this.traces.get(traceName);
-    if (traceInstance) {
-      traceInstance.putMetric(metricName, value);
+    if (!performance) {
+      return;
+    }
+    
+    try {
+      const traceInstance = this.traces.get(traceName);
+      if (traceInstance) {
+        traceInstance.putMetric(metricName, value);
+      }
+    } catch (error) {
+      console.warn('Failed to add trace metric:', traceName, error);
     }
   }
 
   // Quiz-specific performance tracking
   static trackQuizPerformance(quizId: string, action: string): void {
+    if (!performance) {
+      console.log('Performance tracking unavailable for quiz:', quizId, action);
+      return;
+    }
+    
     const traceName = `quiz_${action}_${quizId}`;
     this.startTrace(traceName);
     this.addTraceAttribute(traceName, 'quiz_id', quizId);
@@ -71,6 +116,10 @@ export class PerformanceMonitor {
   }
 
   static finishQuizPerformance(quizId: string, action: string, metrics?: { [key: string]: number }): void {
+    if (!performance) {
+      return;
+    }
+    
     const traceName = `quiz_${action}_${quizId}`;
     
     if (metrics) {
@@ -84,21 +133,37 @@ export class PerformanceMonitor {
 
   // Page load performance
   static trackPageLoad(pageName: string): void {
+    if (!performance) {
+      return;
+    }
+    
     this.startTrace(`page_load_${pageName}`);
     this.addTraceAttribute(`page_load_${pageName}`, 'page', pageName);
   }
 
   static finishPageLoad(pageName: string): void {
+    if (!performance) {
+      return;
+    }
+    
     this.stopTrace(`page_load_${pageName}`);
   }
 
   // Component render performance
   static trackComponentRender(componentName: string): void {
+    if (!performance) {
+      return;
+    }
+    
     this.startTrace(`render_${componentName}`);
     this.addTraceAttribute(`render_${componentName}`, 'component', componentName);
   }
 
   static finishComponentRender(componentName: string): void {
+    if (!performance) {
+      return;
+    }
+    
     this.stopTrace(`render_${componentName}`);
   }
 }

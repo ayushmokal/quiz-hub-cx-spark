@@ -22,6 +22,7 @@ import { UserManagement } from './components/admin/UserManagement';
 import { QuizImport } from './components/admin/QuizImport';
 import { Settings } from './components/admin/Settings';
 import { QuizRoute } from './components/quiz/QuizRoute';
+import { analytics } from './services/analytics';
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function Layout({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   
   // Extract current view from pathname for navigation highlighting
   const getCurrentView = () => {
@@ -58,6 +60,13 @@ function Layout({ children }: { children: React.ReactNode }) {
   const currentView = getCurrentView();
 
   const handleViewChange = (view: string) => {
+    // Track navigation
+    analytics.trackNavigation({
+      from_page: currentView,
+      to_page: view,
+      user_role: user?.role
+    });
+    
     switch (view) {
       case 'dashboard':
         navigate('/');

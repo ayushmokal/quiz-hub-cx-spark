@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useGlobalState } from '../../contexts/GlobalStateContext';
 import { dashboardAPI, topicsAPI, quizAPI } from '../../services/api';
 import { Topic, DashboardStats, QuizAttempt } from '../../types';
+import { analytics } from '../../services/analytics';
 
 interface DashboardProps {
   onViewChange: (view: string) => void;
@@ -84,6 +85,14 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
   useEffect(() => {
     loadDashboardData();
   }, [loadDashboardData]);
+
+  // Track dashboard view
+  useEffect(() => {
+    if (user) {
+      analytics.trackDashboardView();
+      analytics.trackPageView('dashboard', { user_role: user.role });
+    }
+  }, [user]);
 
   // Listen for global state changes
   useEffect(() => {
@@ -304,7 +313,10 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
           </CardHeader>
           <CardContent className="p-3 md:p-6 pt-0 space-y-2 md:space-y-3">
             <Button 
-              onClick={() => onViewChange('quiz')}
+              onClick={() => {
+                analytics.trackFeatureUsed('quick_quiz_button');
+                onViewChange('quiz');
+              }}
               className="w-full quiz-button-primary h-auto py-2 md:py-3"
             >
               <Play className="mr-2 h-3 w-3 md:h-4 md:w-4" />
@@ -313,7 +325,10 @@ export function Dashboard({ onViewChange, refreshTrigger }: DashboardProps) {
               </div>
             </Button>
             <Button 
-              onClick={() => onViewChange('leaderboard')}
+              onClick={() => {
+                analytics.trackFeatureUsed('leaderboard_button');
+                onViewChange('leaderboard');
+              }}
               variant="outline" 
               className="w-full h-auto py-2 md:py-3"
             >

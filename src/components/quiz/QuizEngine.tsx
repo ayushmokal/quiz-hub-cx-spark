@@ -9,6 +9,7 @@ import { useToast } from '../../hooks/use-toast';
 import { Topic, Question } from '../../types';
 import { questionsAPI, quizAPI } from '../../services/api';
 import { QuizResults } from './QuizResults';
+import { analytics } from '../../services/analytics';
 
 interface QuizEngineProps {
   topic: Topic;
@@ -52,6 +53,21 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
   const [timeLeft, setTimeLeft] = useState(30);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Handle quiz exit with tracking
+  const handleQuizExit = useCallback(() => {
+    // Track quiz abandonment if not completed
+    if (!quizState.showResults && quizState.questions.length > 0) {
+      analytics.trackQuizAbandoned({
+        topic_id: topic.id,
+        topic_name: topic.displayName,
+        category: topic.category,
+        questions_answered: quizState.currentQuestionIndex,
+        question_count: quizState.questions.length
+      });
+    }
+    onExit();
+  }, [quizState.showResults, quizState.questions.length, quizState.currentQuestionIndex, topic.id, topic.displayName, topic.category, onExit]);
+
   // Load questions when component mounts
   useEffect(() => {
     const loadQuestions = async () => {
@@ -63,7 +79,7 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
             description: "This topic doesn't have any questions yet.",
             variant: "destructive"
           });
-          onExit();
+          handleQuizExit();
           return;
         }
 
@@ -79,6 +95,14 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
         
         setTimeLeft(shuffledQuestions[0]?.timeLimit || 30);
         setIsLoading(false);
+        
+        // Track quiz started
+        analytics.trackQuizStarted({
+          topic_id: topic.id,
+          topic_name: topic.displayName,
+          category: topic.category,
+          question_count: shuffledQuestions.length
+        });
       } catch (error) {
         console.error('Error loading questions:', error);
         toast({
@@ -86,12 +110,12 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
           description: "Failed to load questions. Please try again.",
           variant: "destructive"
         });
-        onExit();
+        handleQuizExit();
       }
     };
 
     loadQuestions();
-  }, [topic.id, toast, onExit]);
+  }, [topic.id, toast, handleQuizExit]);
 
   // Timer effect
   useEffect(() => {
@@ -130,6 +154,23 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
     if (quizState.showResults) return;
 
     const questionTime = (Date.now() - quizState.questionStartTime) / 1000;
+    const currentQuestion = quizState.questions[quizState.currentQuestionIndex];
+    
+    // Calculate if answer is correct
+    const correctAnswers = currentQuestion.correctAnswers || [];
+    const isCorrect = selectedAnswers.length === correctAnswers.length && 
+                     selectedAnswers.every(answer => correctAnswers.includes(answer));
+    
+    // Track question answered
+    analytics.trackQuestionAnswered({
+      topic_id: topic.id,
+      question_id: currentQuestion.id,
+      question_type: currentQuestion.type,
+      difficulty: currentQuestion.difficulty,
+      is_correct: isCorrect,
+      time_taken: questionTime,
+      user_answer: selectedAnswers.join(',')
+    });
     
     // Update answers and time tracking
     setQuizState(prev => {
@@ -197,6 +238,20 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
       showResults: true
     }));
 
+    // Track quiz completion
+    analytics.trackQuizCompleted({
+      topic_id: topic.id,
+      topic_name: topic.displayName,
+      category: topic.category,
+      difficulty: questions[0]?.difficulty, // Use first question difficulty as representative
+      question_count: questions.length,
+      score: totalScore,
+      accuracy: accuracy,
+      time_taken: times.reduce((sum, time) => sum + time, 0),
+      questions_correct: correctAnswers,
+      questions_incorrect: questions.length - correctAnswers
+    });
+
     // Submit to backend
     submitQuizResults(totalScore, accuracy, avgTime, answers, questions);
   };
@@ -259,7 +314,8 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
       isSubmitting: false,
       showResults: false,
       score: 0,
-      accuracy: 0
+      accuracy: 0,
+      avgTime: 0
     });
     setSelectedAnswers([]);
     setTimeLeft(quizState.questions[0]?.timeLimit || 30);
@@ -318,7 +374,7 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
             <p className="text-slate-600">This topic doesn't have any questions yet.</p>
           </div>
           <button
-            onClick={onExit}
+            onClick={handleQuizExit}
             className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200"
           >
             Back to Topics
@@ -443,7 +499,7 @@ export function QuizEngine({ topic, onComplete, onExit }: QuizEngineProps) {
         {/* Navigation - Modern Floating Bar */}
         <div className="mt-4 md:mt-8 flex flex-col space-y-3 md:flex-row md:justify-between md:items-center md:space-y-0">
           <button
-            onClick={onExit}
+            onClick={handleQuizExit}
             className="px-4 py-2 md:px-6 md:py-3 text-slate-600 hover:text-slate-900 font-semibold transition-colors duration-200 hover:bg-slate-100 rounded-xl order-2 md:order-1"
           >
             Exit Quiz
